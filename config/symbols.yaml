@@ -1,0 +1,7 @@
+symbols:
+  - XAUUSD
+
+trading:
+  primary_symbol: XAUUSD
+  primary_timeframe: M5
+  instrument_name: Gold

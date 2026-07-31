@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ATIS · Gold Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="shell-top">
+    <div class="brand-block">
+      <div class="logo">A</div>
+      <div>
+        <div class="brand-title">ATIS Gold Desk</div>
+        <div class="brand-sub">XAUUSD · نظام التداول الخوارزمي</div>
+      </div>
+    </div>
+    <div class="status-strip" id="status-strip">
+      <div class="status-item"><span>MT5</span><strong id="st-mt5">…</strong></div>
+      <div class="status-item"><span>الرمز</span><strong id="st-symbol">XAUUSD</strong></div>
+      <div class="status-item"><span>الإطار</span><strong id="st-tf">M5</strong></div>
+      <div class="status-item"><span>السعر</span><strong id="st-price">—</strong></div>
+      <div class="status-item"><span>التدريب</span><strong id="st-train">—</strong></div>
+      <div class="status-item"><span>التداول الآلي</span><strong id="st-auto">متوقف</strong></div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btn-refresh" type="button">تحديث</button>
+      <button class="btn danger" id="btn-kill" type="button">إيقاف طوارئ</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="nav">
+      <button class="nav-btn active" data-tab="train" type="button">التدريب والاختبار</button>
+      <button class="nav-btn" data-tab="data" type="button">حالة البيانات</button>
+      <button class="nav-btn" data-tab="patterns" type="button">الأنماط والشموع</button>
+      <button class="nav-btn" data-tab="trade" type="button">التداول الآلي</button>
+      <button class="nav-btn" data-tab="settings" type="button">الإعدادات</button>
+      <button class="nav-btn" data-tab="engines" type="button">المحركات</button>
+      <div class="nav-foot" id="nav-foot">—</div>
+    </aside>
+
+    <main class="content">
+      <!-- TRAINING & TESTING (default tab) -->
+      <section class="tab active" id="tab-train">
+        <div class="page-head">
+          <div>
+            <h1>التدريب والاختبار</h1>
+            <p class="page-desc">تدريب M1 · M5 · M15 · M30 · H1 · H4 مع فصل واضح بين التشغيل الحالي والبطل المحفوظ</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="btn-export-training-html" type="button">تصدير HTML</button>
+            <button class="btn primary" data-run="4" type="button">تدريب كل الأطر الآن</button>
+          </div>
+        </div>
+
+        <div class="banner" id="train-banner">جاري تحميل حالة التدريب…</div>
+        <div id="train-progress" class="progress-panel" hidden style="margin-top:1rem">
+          <div class="progress-head">
+            <span id="train-progress-label">جاري تنفيذ Training / Testing / Validation…</span>
+            <span id="train-progress-pct">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="train-progress-bar" class="progress-fill" style="width:0%"></div>
+          </div>
+          <div id="train-progress-step" class="progress-step">—</div>
+          <div class="stage-progress-list" style="margin-top:0.9rem">
+            <div class="stage-progress-item">
+              <div class="stage-progress-head">
+                <span>التدريب</span>
+                <span id="train-phase-train-pct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="train-phase-train-bar" class="progress-fill" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="stage-progress-item">
+              <div class="stage-progress-head">
+                <span>التحقق Validation</span>
+                <span id="train-phase-validation-pct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="train-phase-validation-bar" class="progress-fill" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="stage-progress-item">
+              <div class="stage-progress-head">
+                <span>الاختبار Testing</span>
+                <span id="train-phase-test-pct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="train-phase-test-bar" class="progress-fill" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <article class="card" id="current-run-panel" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>التشغيل الحالي</h2>
+            <span class="chip" id="current-run-pipeline">pipeline —</span>
+          </div>
+          <p class="card-note" id="current-run-meta">لا يوجد تشغيل حديث بعد — اضغط «تدريب كل الأطر الآن».</p>
+          <div id="train-timeline" class="stage-strip" style="margin-bottom:0.85rem"></div>
+          <div id="current-run-tf-cards" class="tf-status-grid"></div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>التنفيذ الحي للتدريب</h2>
+          <p class="card-note">يعرض مراحل التدريب والاختبار والتحقق، مع السجلات الحية وأحدث الرسائل القادمة من الخلفية.</p>
+          <pre id="train-live-logs" class="json-view" style="max-height:220px">لا توجد سجلات مباشرة بعد</pre>
+        </article>
+
+        <article class="card">
+          <h2>هذا التشغيل · نتائج الأطر</h2>
+          <p class="card-note">أرقام التشغيل الحالي فقط — لا تُخلط مع أبطال محفوظين سابقاً.</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Timeframe</th>
+                  <th>الحالة</th>
+                  <th>Acc</th>
+                  <th>AUC</th>
+                  <th>Sharpe</th>
+                  <th>Exp</th>
+                  <th>Sortino</th>
+                  <th>Regime</th>
+                  <th>PBO</th>
+                  <th>CI low</th>
+                  <th>Trades</th>
+                  <th>البوابات</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="train-matrix-current"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>آخر نموذج محفوظ / بطل</h2>
+          <p class="card-note">أحدث أثر محفوظ لكل إطار (قد يكون من تشغيل سابق).</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Timeframe</th>
+                  <th>الحالة</th>
+                  <th>الشموع</th>
+                  <th>Accuracy</th>
+                  <th>F1</th>
+                  <th>Val Sharpe</th>
+                  <th>Sharpe</th>
+                  <th>Max DD</th>
+                  <th>مجموع عوائد الصفقات</th>
+                  <th>بوابات</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="train-matrix"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <div class="page-head" style="margin-top:1.25rem">
+          <div>
+            <h2 style="margin:0;font-size:1.15rem">تفاصيل الإطار المحدد</h2>
+            <p class="page-desc">اختر إطاراً من المصفوفة لعرض تفاصيل التدريب والاختبار</p>
+          </div>
+          <select id="tf-select" class="btn" style="min-width:120px"></select>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="card-head-row">
+              <h2>حالة التدريب</h2>
+              <button class="btn" id="btn-open-training-artifact" type="button">فتح مسار الناتج</button>
+            </div>
+            <table class="kv">
+              <tbody id="train-status-table"></tbody>
+            </table>
+          </article>
+          <article class="card">
+            <h2>بيانات التدريب المستخدمة</h2>
+            <table class="kv">
+              <tbody id="train-data-table"></tbody>
+            </table>
+          </article>
+        </div>
+
+        <div class="grid-2" style="margin-top:1rem">
+          <article class="card">
+            <h2>نتائج التصنيف (اختبار)</h2>
+            <div class="kpi-row" id="cls-kpis"></div>
+            <table class="data">
+              <thead><tr><th>المقياس</th><th>القيمة</th></tr></thead>
+              <tbody id="cls-table"></tbody>
+            </table>
+          </article>
+          <article class="card">
+            <h2>نتائج الاختبار المالي (OOS)</h2>
+            <div class="kpi-row" id="fin-kpis"></div>
+            <table class="data">
+              <thead><tr><th>المقياس</th><th>القيمة</th></tr></thead>
+              <tbody id="fin-table"></tbody>
+            </table>
+          </article>
+        </div>
+
+        <article class="card" id="tie-panel" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>محرك التدريب الذكي · e4-v16 Research Factory</h2>
+            <span class="chip" id="tie-pipeline-chip">Research Factory —</span>
+          </div>
+          <p class="card-note">Barrier sweep · Label cleaning · Fold stability · Crisis holdout · Shadow challenger · Research board · H4 quarantine.</p>
+          <div class="kpi-row" id="tie-kpis"></div>
+          <div class="grid-2" style="margin-top:0.75rem">
+            <div>
+              <h3 class="subhead">تحقق أنظمة السوق</h3>
+              <div id="tie-regime-grid" class="regime-grid"></div>
+              <table class="kv" style="margin-top:0.6rem"><tbody id="tie-regime-meta"></tbody></table>
+            </div>
+            <div>
+              <h3 class="subhead">إحصاءات متقدمة · تنفيذ · معرفة</h3>
+              <table class="kv"><tbody id="tie-advanced-table"></tbody></table>
+              <div id="tie-knowledge-box" class="knowledge-box" style="margin-top:0.65rem">لا توجد حلقات معرفة بعد لهذا الإطار.</div>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:0.85rem">
+            <div>
+              <h3 class="subhead">مقارنة Model Zoo</h3>
+              <div class="table-scroll">
+                <table class="data">
+                  <thead>
+                    <tr>
+                      <th>النموذج</th>
+                      <th>Val Acc</th>
+                      <th>رتبة</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tie-zoo-table"><tr><td colspan="3" class="muted">—</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h3 class="subhead">جودة Labels · تفسير الميزات · Challenger</h3>
+              <table class="kv"><tbody id="tie-v15-table"></tbody></table>
+              <div id="tie-recs-box" class="knowledge-box" style="margin-top:0.65rem">لا توجد توصيات بعد.</div>
+            </div>
+          </div>
+          <div style="margin-top:0.85rem">
+            <h3 class="subhead">أهم الميزات (Consensus / SHAP)</h3>
+            <div class="table-scroll">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th>الميزة</th>
+                    <th>الدرجة</th>
+                    <th>المصدر</th>
+                  </tr>
+                </thead>
+                <tbody id="tie-shap-table"><tr><td colspan="3" class="muted">—</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+
+        <div class="grid-2" style="margin-top:1rem">
+          <article class="card">
+            <h2>مراحل التدريب والاختبار والتحقق</h2>
+            <div id="train-stage-strip" class="stage-strip"></div>
+          </article>
+          <article class="card">
+            <h2>لوحة الصحة العامة للنموذج</h2>
+            <div id="train-health-bars" class="metric-bars"></div>
+          </article>
+        </div>
+
+        <div class="grid-2" style="margin-top:1rem">
+          <article class="card">
+            <h2>مخطط الإصدارات والنتائج</h2>
+            <div id="train-version-chart" class="viz-card">لا توجد بيانات بعد</div>
+          </article>
+          <article class="card">
+            <h2>مخطط الطيات / التحقق</h2>
+            <div id="train-fold-chart" class="viz-card">لا توجد بيانات بعد</div>
+          </article>
+        </div>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>مقارنة نتائج الاختبار</h2>
+          <p class="card-note">النموذج مقابل Buy & Hold مقابل خط أساس عشوائي — على نفس نافذة Out-of-Sample</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>المصدر</th>
+                  <th>Sharpe</th>
+                  <th>Sortino</th>
+                  <th>Max DD</th>
+                  <th>Win Rate</th>
+                  <th>Profit Factor</th>
+                  <th>العائد الكلي</th>
+                </tr>
+              </thead>
+              <tbody id="compare-table"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>مقارنة الإصدارات السابقة</h2>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الإصدار</th>
+                  <th>النوع</th>
+                  <th>Sharpe</th>
+                  <th>Max DD</th>
+                  <th>العائد</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="train-version-history"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>طيات Walk-Forward (تفاصيل الاختبار المتسلسل)</h2>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>fold</th>
+                  <th>acc</th>
+                  <th>f1</th>
+                  <th>auc</th>
+                  <th>trade_rate</th>
+                  <th>val_sharpe</th>
+                  <th>n_val_trades</th>
+                  <th>notes</th>
+                </tr>
+              </thead>
+              <tbody id="folds-table"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>الميزات المستخدمة في التدريب</h2>
+          <div class="feature-cloud" id="feature-cloud"></div>
+        </article>
+      </section>
+
+      <!-- DATA -->
+      <section class="tab" id="tab-data">
+        <div class="page-head">
+          <div>
+            <h1>حالة البيانات</h1>
+            <p class="page-desc">كل Timeframe في ملف JSON منفصل · الطبقات raw / clean / features · إمكانية فتح الملف واستعراضه</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-pipeline" type="button">تحديث كل الأطر</button>
+            <button class="btn danger" id="btn-pipeline-stop" type="button" disabled>إيقاف التحديث</button>
+          </div>
+        </div>
+        <div id="pipeline-progress" class="progress-panel" hidden>
+          <div class="progress-head">
+            <span id="pipeline-progress-label">جاري تحديث كل الأطر…</span>
+            <span id="pipeline-progress-pct">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="pipeline-progress-bar" class="progress-fill" style="width:0%"></div>
+          </div>
+          <div id="pipeline-progress-step" class="progress-step">—</div>
+        </div>
+        <article class="card">
+          <div class="table-scroll tall">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Timeframe</th>
+                  <th>الطبقة</th>
+                  <th>الشموع</th>
+                  <th>من</th>
+                  <th>إلى</th>
+                  <th>المدة (يوم)</th>
+                  <th>الحالة</th>
+                  <th>ملف JSON</th>
+                </tr>
+              </thead>
+              <tbody id="coverage-body"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card" style="margin-top:1rem">
+          <h2>ملفات حالة البيانات (JSON لكل إطار)</h2>
+          <p class="page-desc" id="registry-root-label" style="margin-bottom:0.75rem">data/registry/</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الإطار</th>
+                  <th>الملف</th>
+                  <th>الحجم</th>
+                  <th>آخر تحديث</th>
+                  <th>الرموز</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="registry-files-body"></tbody>
+            </table>
+          </div>
+        </article>
+        <div class="grid-3" style="margin-top:1rem" id="layer-summary"></div>
+      </section>
+
+      <!-- PATTERNS -->
+      <section class="tab" id="tab-patterns">
+        <div class="page-head">
+          <div>
+            <h1>الأنماط والشموع المتقدمة</h1>
+            <p class="page-desc">استكشاف عميق على ملفات JSON لكل إطار · شموع + هيكلية + مركّبة · تصدير تلقائي لكل قسم بعد الانتهاء</p>
+          </div>
+          <div class="btn-row">
+            <select id="pattern-tf" class="btn" style="min-width:100px">
+              <option>M1</option><option selected>M5</option><option>M15</option><option>M30</option>
+              <option>H1</option><option>H4</option><option>D1</option><option>W1</option><option>MN1</option>
+            </select>
+            <button class="btn" data-run="3" type="button">إعادة بناء الميزات</button>
+            <button class="btn" id="btn-pattern-export-json" type="button">تصدير JSON</button>
+            <button class="btn primary" id="btn-pattern-discover" type="button">استكشاف الكل</button>
+          </div>
+        </div>
+
+        <article class="card" style="margin-bottom:1rem">
+          <h2>استكشاف حسب الإطار الزمني (Thread مستقل لكل زر)</h2>
+          <p class="card-note">يمكنك تشغيل عدة أطر معًا في نفس الوقت — كل زر يعمل في خيط منفصل دون انتظار الباقي</p>
+          <div class="discover-tf-grid" id="discover-tf-buttons">
+            <div class="discover-tf-card" data-tf-card="M1">
+              <button class="btn" type="button" data-discover-tf="M1">استكشاف M1</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="M1" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="M1"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="M1">0%</span><span data-tf-msg="M1">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="M5">
+              <button class="btn" type="button" data-discover-tf="M5">استكشاف M5</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="M5" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="M5"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="M5">0%</span><span data-tf-msg="M5">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="M15">
+              <button class="btn" type="button" data-discover-tf="M15">استكشاف M15</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="M15" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="M15"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="M15">0%</span><span data-tf-msg="M15">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="M30">
+              <button class="btn" type="button" data-discover-tf="M30">استكشاف M30</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="M30" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="M30"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="M30">0%</span><span data-tf-msg="M30">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="H1">
+              <button class="btn" type="button" data-discover-tf="H1">استكشاف H1</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="H1" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="H1"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="H1">0%</span><span data-tf-msg="H1">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="H4">
+              <button class="btn" type="button" data-discover-tf="H4">استكشاف H4</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="H4" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="H4"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="H4">0%</span><span data-tf-msg="H4">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="D1">
+              <button class="btn" type="button" data-discover-tf="D1">استكشاف D1</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="D1" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="D1"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="D1">0%</span><span data-tf-msg="D1">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="W1">
+              <button class="btn" type="button" data-discover-tf="W1">استكشاف W1</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="W1" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="W1"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="W1">0%</span><span data-tf-msg="W1">جاهز</span></div>
+            </div>
+            <div class="discover-tf-card" data-tf-card="MN1">
+              <button class="btn" type="button" data-discover-tf="MN1">استكشاف MN1</button>
+              <button class="btn danger" type="button" data-cancel-discover-tf="MN1" hidden>إيقاف</button>
+              <div class="tf-progress-track"><div class="tf-progress-fill" data-tf-bar="MN1"></div></div>
+              <div class="tf-progress-meta"><span data-tf-pct="MN1">0%</span><span data-tf-msg="MN1">جاهز</span></div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:0.75rem">
+            <button class="btn primary" id="btn-pattern-discover-parallel" type="button">تشغيل كل الأطر بالتوازي</button>
+            <button class="btn" id="btn-pattern-resume-all" type="button">استئناف المتوقف</button>
+          </div>
+        </article>
+
+        <div id="pattern-progress" class="progress-panel" hidden>
+          <div class="progress-head">
+            <span id="pattern-progress-label">جاري تحليل واستكشاف الأنماط…</span>
+            <span id="pattern-progress-pct">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="pattern-progress-bar" class="progress-fill" style="width:0%"></div>
+          </div>
+          <div id="pattern-progress-step" class="progress-step">—</div>
+        </div>
+
+        <div class="banner" id="pattern-banner">جاري تحليل الأنماط…</div>
+
+        <div class="grid-3">
+          <article class="card">
+            <h2>التحيز الحالي</h2>
+            <div class="kpi-row" style="grid-template-columns:1fr 1fr">
+              <div class="kpi"><div class="l">الاتجاه</div><div class="v" id="bias-label">—</div></div>
+              <div class="kpi"><div class="l">قوة الشمعة</div><div class="v" id="bias-strength">—</div></div>
+            </div>
+            <table class="kv"><tbody id="structure-table"></tbody></table>
+          </article>
+          <article class="card">
+            <h2>أنماط نشطة الآن</h2>
+            <div class="chip-row" id="active-now"></div>
+          </article>
+          <article class="card">
+            <h2>ملخص الكتالوج / المعرفة</h2>
+            <table class="kv"><tbody id="pattern-catalog-stats"></tbody></table>
+          </article>
+        </div>
+
+        <article class="card" style="margin-top:1rem">
+          <h2>مخطط السعر + علامات الأنماط</h2>
+          <canvas id="pattern-chart" width="980" height="280" style="width:100%;height:auto"></canvas>
+          <p class="card-note" id="price-meta">—</p>
+        </article>
+
+        <div class="grid-3" style="margin-top:1rem">
+          <article class="card">
+            <div class="card-head-row">
+              <h2>أنماط الشموع</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="candlesticks">استعراض JSON</button>
+            </div>
+            <div class="chip-row" id="candle-counts"></div>
+          </article>
+          <article class="card">
+            <div class="card-head-row">
+              <h2>الأنماط الهيكلية</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="structural">استعراض JSON</button>
+            </div>
+            <div class="chip-row" id="chart-counts"></div>
+          </article>
+          <article class="card">
+            <div class="card-head-row">
+              <h2>الأنماط المركّبة / المكتشفة</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="compounds">استعراض JSON</button>
+            </div>
+            <div class="chip-row" id="compound-counts"></div>
+          </article>
+        </div>
+
+        <div class="grid-3" style="margin-top:1rem">
+          <article class="card">
+            <div class="card-head-row">
+              <h2>أنماط جديدة NewN</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="new_patterns">استعراض JSON</button>
+            </div>
+            <div class="chip-row" id="new-pattern-counts"></div>
+            <p class="card-note" id="new-pattern-summary">—</p>
+          </article>
+          <article class="card">
+            <div class="card-head-row">
+              <h2>الترتيب / توصيات Engine4</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="rankings">استعراض JSON</button>
+            </div>
+            <div id="rankings-recommended" class="chip-row"></div>
+          </article>
+          <article class="card">
+            <div class="card-head-row">
+              <h2>التحقق الإحصائي</h2>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="validation_report">استعراض JSON</button>
+            </div>
+            <p class="card-note" id="validation-summary">—</p>
+          </article>
+        </div>
+
+        <article class="card" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>شبكة علاقات الأنماط</h2>
+            <button class="btn btn-tiny" type="button" data-view-pattern-section="relations">استعراض JSON</button>
+          </div>
+          <p class="card-note" id="relations-summary">—</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead><tr><th>المصدر</th><th>العلاقة</th><th>الهدف</th><th>العدد</th></tr></thead>
+              <tbody id="relations-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>ملفات JSON المحفوظة (حسب القسم والإطار)</h2>
+            <label class="chip" style="gap:0.35rem">
+              <input type="checkbox" id="pattern-files-all-tf" checked />
+              كل الأطر
+            </label>
+          </div>
+          <p class="card-note" id="patterns-root-label">اضغط «استعراض» لفتح أي ملف بعد انتهاء الاستكشاف أو التصدير</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>القسم</th>
+                  <th>الإطار</th>
+                  <th>عدد العناصر</th>
+                  <th>آخر تحديث</th>
+                  <th>المسار</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="pattern-json-files"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>قاعدة معرفة الأنماط (ظهور · نجاح · ثقة)</h2>
+            <button class="btn btn-tiny" type="button" data-view-pattern-section="knowledge">استعراض JSON</button>
+          </div>
+          <div class="table-scroll tall">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>النمط</th>
+                  <th>الفئة</th>
+                  <th>الإطار</th>
+                  <th>الظهور</th>
+                  <th>نسبة النجاح</th>
+                  <th>الثقة</th>
+                  <th>عائد آجل متوسط</th>
+                  <th>شروط التكوين</th>
+                </tr>
+              </thead>
+              <tbody id="knowledge-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>سجل الاكتشافات التفصيلي</h2>
+            <button class="btn btn-tiny" type="button" data-view-pattern-section="discovery_log">استعراض JSON</button>
+          </div>
+          <div class="table-scroll tall">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الوقت</th>
+                  <th>النمط</th>
+                  <th>الفئة</th>
+                  <th>التحيز</th>
+                  <th>القوة</th>
+                  <th>نجاح %</th>
+                  <th>ثقة</th>
+                  <th>Close</th>
+                </tr>
+              </thead>
+              <tbody id="patterns-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- TRADE -->
+      <section class="tab" id="tab-trade">
+        <div class="page-head">
+          <div>
+            <h1>التداول الآلي</h1>
+            <p class="page-desc">Paper / Demo على الذهب فقط · إدارة مخاطر وStop-Loss إلزامي</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-auto-start" type="button">تشغيل آلي (Demo)</button>
+            <button class="btn" id="btn-auto-start-paper" type="button">Paper فقط</button>
+            <button class="btn" id="btn-auto-stop" type="button">إيقاف</button>
+            <button class="btn" data-run="5-demo" type="button">دورة Demo واحدةحدة</button>
+          </div>
+        </div>
+        <div id="auto-running-banner" class="auto-running-banner" hidden>
+          <span class="auto-pulse" aria-hidden="true"></span>
+          <div>
+            <strong id="auto-running-title">التداول الآلي يعمل الآن</strong>
+            <p id="auto-running-meta">—</p>
+          </div>
+        </div>
+        <article class="card" style="margin-bottom:1rem">
+          <div class="card-head-row">
+            <h2>الأطر الزمنية للتداول</h2>
+            <label class="chip auto-tf-all">
+              <input type="checkbox" id="auto-tf-all" />
+              تحديد الكل
+            </label>
+          </div>
+          <p class="card-note">اختر إطاراً أو أكثر — كل إطار يستخدم نموذجه المدرّب (FinalModel / Champion). عند اختيار عدة أطر تُدمج الأصوات في قرار واحد قبل الشراء/البيع</p>
+          <div class="auto-tf-grid" id="auto-tf-checks">
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M1" /> M1</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M5" /> M5</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M15" checked /> M15</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M30" checked /> M30</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="H1" checked /> H1</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="H4" checked /> H4</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="D1" /> D1</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="W1" /> W1</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="MN1" /> MN1</label>
+          </div>
+        </article>
+        <div class="grid-2">
+          <article class="card">
+            <h2>حالة المحرك الحي</h2>
+            <table class="kv"><tbody id="auto-table"></tbody></table>
+          </article>
+          <article class="card">
+            <h2>النموذج المستخدم</h2>
+            <table class="kv"><tbody id="model-table"></tbody></table>
+          </article>
+        </div>
+        <article class="card" style="margin-top:1rem">
+          <h2>آخر قرار وتفسيره</h2>
+          <table class="kv"><tbody id="decision-table"></tbody></table>
+        </article>
+        <article class="card" style="margin-top:1rem">
+          <h2>سجل الصفقات</h2>
+          <div class="table-scroll">
+            <table class="data">
+              <thead><tr><th>الوقت</th><th>الاتجاه</th><th>الحجم</th><th>الدخول</th><th>SL</th><th>TP</th><th>الوضع</th><th>الثقة</th></tr></thead>
+              <tbody id="trades-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="tab" id="tab-settings">
+        <div class="page-head">
+          <div>
+            <h1>الإعدادات</h1>
+            <p class="page-desc">ضبط شروط الدخول الحي · الموديل دائماً هو الأساس</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-settings-save" type="button">حفظ الإعدادات</button>
+          </div>
+        </div>
+
+        <article class="card">
+          <div class="card-head-row">
+            <h2>شرط السبريد (Bid / Ask)</h2>
+            <label class="chip auto-tf-all" id="spread-filter-toggle-wrap">
+              <input type="checkbox" id="setting-use-spread-filter" />
+              تفعيل فلتر السبريد
+            </label>
+          </div>
+          <p class="card-note" id="spread-filter-help">
+            عند التفعيل: الدخول = إشارة الموديل المدرَّب ثم سبريد منخفض جداً.
+            عند الإلغاء: الدخول يعتمد على الموديل فقط دون شرط السبريد.
+          </p>
+          <div class="banner" id="spread-mode-banner">—</div>
+          <table class="kv" style="margin-top:0.75rem">
+            <tbody>
+              <tr>
+                <th>أقصى سبريد للدخول (pips)</th>
+                <td><input class="btn" id="setting-max-spread" type="number" min="0.1" step="0.1" style="width:8rem;text-align:left;direction:ltr" /></td>
+              </tr>
+              <tr>
+                <th>سبريد ضيق جداً (pips)</th>
+                <td><input class="btn" id="setting-tight-spread" type="number" min="0.1" step="0.1" style="width:8rem;text-align:left;direction:ltr" /></td>
+              </tr>
+              <tr>
+                <th>أقصى صفقات لكل دورة عند السبريد الضيق</th>
+                <td><input class="btn" id="setting-max-entries" type="number" min="1" max="50" step="1" style="width:8rem;text-align:left;direction:ltr" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <!-- ENGINES -->
+      <section class="tab" id="tab-engines">
+        <div class="page-head">
+          <div>
+            <h1>المحركات</h1>
+            <p class="page-desc">تشغيل كل مرحلة بشكل منفصل ومتابعة المهام</p>
+          </div>
+        </div>
+        <div class="engine-grid">
+          <article class="card engine-card">
+            <div class="engine-num">01</div>
+            <h2>جلب البيانات</h2>
+            <div id="stats-1" class="mini-stats"></div>
+            <button class="btn" data-run="1" type="button">تشغيل</button>
+          </article>
+          <article class="card engine-card">
+            <div class="engine-num">02</div>
+            <h2>تنظيف البيانات</h2>
+            <div id="stats-2" class="mini-stats"></div>
+            <button class="btn" data-run="2" type="button">تشغيل</button>
+          </article>
+          <article class="card engine-card">
+            <div class="engine-num">03</div>
+            <h2>الميزات والأنماط</h2>
+            <div id="stats-3" class="mini-stats"></div>
+            <button class="btn" data-run="3" type="button">تشغيل</button>
+          </article>
+          <article class="card engine-card">
+            <div class="engine-num">04</div>
+            <h2>التدريب</h2>
+            <div id="stats-4" class="mini-stats"></div>
+            <button class="btn" data-run="4" type="button">تشغيل</button>
+          </article>
+          <article class="card engine-card">
+            <div class="engine-num">05</div>
+            <h2>التنفيذ الحي</h2>
+            <div id="stats-5" class="mini-stats"></div>
+            <button class="btn" data-run="5-demo" type="button">Demo مرة</button>
+          </article>
+        </div>
+        <article class="card" style="margin-top:1rem">
+          <h2>المهام الجارية / الأخيرة</h2>
+          <ul class="jobs" id="jobs-list"></ul>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <div id="json-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="json-modal-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="json-modal-title">ملف JSON</h2>
+          <p class="page-desc" id="json-modal-path">—</p>
+        </div>
+        <button class="btn" type="button" data-close-modal>إغلاق</button>
+      </div>
+      <pre id="json-modal-body" class="json-view"></pre>
+    </div>
+  </div>
+  <script src="/static/app.js?v=20260731c"></script>
+</body>
+</html>

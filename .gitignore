@@ -1,0 +1,45 @@
+# Secrets — never commit
+config/secrets.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Data & models (large / regenerated)
+data/raw/
+data/clean/
+data/features/
+data/patterns/
+data/registry/*.db
+models/
+logs/
+*.parquet
+*.pkl
+*.onnx
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Notebooks checkpoints
+notebooks/.ipynb_checkpoints/

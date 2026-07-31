@@ -1,0 +1,38 @@
+# Independent pipelines — each TF is isolated (Principle 1.2)
+timeframes:
+  M1:
+    mt5_constant: TIMEFRAME_M1
+    minutes: 1
+    schedule_seconds: 60
+  M5:
+    mt5_constant: TIMEFRAME_M5
+    minutes: 5
+    schedule_seconds: 300
+  M15:
+    mt5_constant: TIMEFRAME_M15
+    minutes: 15
+    schedule_seconds: 900
+  M30:
+    mt5_constant: TIMEFRAME_M30
+    minutes: 30
+    schedule_seconds: 1800
+  H1:
+    mt5_constant: TIMEFRAME_H1
+    minutes: 60
+    schedule_seconds: 3600
+  H4:
+    mt5_constant: TIMEFRAME_H4
+    minutes: 240
+    schedule_seconds: 14400
+  D1:
+    mt5_constant: TIMEFRAME_D1
+    minutes: 1440
+    schedule_seconds: 86400
+  W1:
+    mt5_constant: TIMEFRAME_W1
+    minutes: 10080
+    schedule_seconds: 604800
+  MN1:
+    mt5_constant: TIMEFRAME_MN1
+    minutes: 43200
+    schedule_seconds: 2592000

@@ -1,0 +1,52 @@
+# Indicator configuration — Engine 3 / shared.feature_engine
+# Same definitions used in training and live (Train/Live Parity)
+
+trend:
+  sma_periods: [9, 20, 50, 100, 200]
+  ema_periods: [9, 20, 50, 100, 200]
+  wma_periods: [9, 20, 50]
+  macd:
+    fast: 12
+    slow: 26
+    signal: 9
+  adx_period: 14
+  parabolic_sar:
+    step: 0.02
+    max_af: 0.2
+  ichimoku:
+    tenkan: 9
+    kijun: 26
+    senkou_b: 52
+
+momentum:
+  rsi_periods: [14]
+  stochastic:
+    k_period: 14
+    d_period: 3
+  cci_period: 20
+  williams_r_period: 14
+  roc_period: 12
+
+volatility:
+  bollinger:
+    period: 20
+    std: 2.0
+  atr_period: 14
+  std_channel_period: 20
+  keltner:
+    period: 20
+    atr_mult: 1.5
+
+volume:
+  enabled: true
+  vwap_reset: session  # informational
+
+patterns:
+  candlestick: true
+  structural: true  # support/resistance swings
+  compound: true    # overlapping / composite patterns
+
+context:
+  session_tagging: true
+  volatility_regime: true
+  trend_strength: true

@@ -1,0 +1,502 @@
+project:
+  name: ATIS
+  version: 0.2.0
+  timezone: UTC
+  random_seed: 42
+  focus: gold
+paths:
+  data_raw: data/raw
+  data_clean: data/clean
+  data_features: data/features
+  data_registry: data/registry
+  data_patterns: data/patterns
+  models: models
+  logs: logs
+trading:
+  primary_symbol: XAUUSD
+  primary_timeframe: H1
+  instrument_name: Gold
+  allowed_live_symbols:
+  - XAUUSD
+  broker_symbol_map:
+    XAUUSD: XAUUSD@
+engine1_ingestion:
+  backfill_years: 3
+  max_bars_per_request: 10000
+  retry_max_attempts: 5
+  retry_backoff_seconds: 2.0
+  retry_backoff_multiplier: 2.0
+  force_rebuild: false
+  default_symbols:
+  - XAUUSD
+  default_timeframes:
+  - M1
+  - M5
+  - M15
+  - M30
+  - H1
+  - H4
+  - D1
+  - W1
+  - MN1
+engine2_cleaning:
+  max_gap_fill_bars: 3
+  fill_strategy: linear
+  outlier_method: iqr
+  outlier_zscore_threshold: 4.0
+  outlier_iqr_multiplier: 3.0
+  flag_outliers_only: true
+  timezone: UTC
+engine3_features:
+  indicators_config: config/indicators.yaml
+  lookback_bars: 250
+engine4_training:
+  model_family: baseline
+  task: classification
+  horizon_bars: 12
+  horizon_by_timeframe:
+    M1: 30
+    M5: 12
+    M15: 12
+    M30: 8
+    H1: 6
+    H4: 4
+    D1: 3
+    W1: 2
+    MN1: 1
+  labeling: triple_barrier
+  barrier_atr_multiplier: 1.5
+  barrier_atr_multiplier_by_tf:
+    M1: 2.2
+    M5: 2.0
+    M15: 1.6
+    M30: 1.5
+    H1: 1.5
+    H4: 1.85
+  train_on_directional_only: true
+  drop_constant_features: true
+  drop_registry_context: true
+  walk_forward_splits: 5
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  top_features: 56
+  top_features_by_tf:
+    M1: 40
+    M5: 44
+    M15: 52
+    M30: 52
+    H1: 56
+    H4: 36
+  stable_feature_selection: true
+  stable_feature_min_frac: 0.6
+  stable_feature_windows: 3
+  engineer_learning_features: true
+  cross_tf_features: true
+  overtrading_rate_tol_frac: 0.05
+  cross_tf_sources:
+  - W1
+  - D1
+  - H4
+  - H1
+  - M30
+  - M15
+  - M5
+  time_decay_half_life: 0.35
+  trend_align: true
+  write_final_model: true
+  allow_paper_final: false
+  fold_validation_ratio: 0.25
+  tune_trade_policy: true
+  tune_policy_mode: once_liquid
+  calibrate_probabilities: true
+  baseline_model: lightgbm
+  lgb_estimators: 240
+  lgb_learning_rate: 0.028
+  lgb_max_depth: 4
+  lgb_num_leaves: 15
+  lgb_min_child_samples: 120
+  lgb_subsample: 0.75
+  lgb_colsample: 0.55
+  lgb_reg_alpha: 0.5
+  lgb_reg_lambda: 3.0
+  lgb_early_stopping: true
+  lgb_early_stopping_rounds: 50
+  lgb_by_tf:
+    M1:
+      lgb_estimators: 160
+      lgb_max_depth: 3
+      lgb_num_leaves: 12
+      lgb_min_child_samples: 220
+      lgb_reg_lambda: 5.5
+      lgb_reg_alpha: 1.0
+      lgb_colsample: 0.42
+      lgb_subsample: 0.7
+      lgb_learning_rate: 0.022
+    M5:
+      lgb_estimators: 180
+      lgb_max_depth: 3
+      lgb_num_leaves: 14
+      lgb_min_child_samples: 180
+      lgb_reg_lambda: 4.8
+      lgb_reg_alpha: 0.85
+      lgb_colsample: 0.48
+      lgb_subsample: 0.72
+      lgb_learning_rate: 0.024
+    H4:
+      lgb_estimators: 140
+      lgb_max_depth: 3
+      lgb_num_leaves: 10
+      lgb_min_child_samples: 160
+      lgb_reg_lambda: 6.5
+      lgb_reg_alpha: 1.2
+      lgb_colsample: 0.4
+      lgb_subsample: 0.68
+      lgb_learning_rate: 0.022
+    H1:
+      lgb_estimators: 180
+      lgb_max_depth: 3
+      lgb_num_leaves: 12
+      lgb_min_child_samples: 180
+      lgb_reg_lambda: 5.5
+      lgb_reg_alpha: 1.0
+      lgb_colsample: 0.45
+      lgb_subsample: 0.7
+      lgb_learning_rate: 0.022
+      lgb_early_stopping_rounds: 40
+    M30:
+      lgb_estimators: 230
+      lgb_min_child_samples: 110
+      lgb_reg_lambda: 2.8
+    M15:
+      lgb_estimators: 200
+      lgb_min_child_samples: 160
+      lgb_reg_lambda: 4.0
+      lgb_reg_alpha: 0.7
+      lgb_colsample: 0.5
+  fail_on_overfit: true
+  fail_on_unstable_generalization: true
+  max_train_val_acc_gap: 0.16
+  max_train_val_sharpe_gap: 2.0
+  val_test_sharpe_gap_hard_max: 3.5
+  max_train_val_acc_gap_by_tf:
+    H4: 0.14
+    M1: 0.16
+    M5: 0.16
+  decision_threshold: 0.54
+  min_trade_confidence: 0.54
+  directional_edge: 0.16
+  confidence_quantile: 0.85
+  confidence_quantile_by_tf:
+    M1: 0.84
+    M5: 0.8
+    M15: 0.78
+    M30: 0.78
+    H1: 0.84
+    H4: 0.8
+  min_confidence_floor: 0.52
+  max_confidence_floor: 0.7
+  cost_edge_multiple: 1.35
+  cost_edge_multiple_by_tf:
+    M1: 1.55
+    M5: 1.4
+    M15: 1.15
+    M30: 1.2
+    H1: 1.3
+    H4: 1.35
+  regime_filter: true
+  regime_atr_low_q: 0.22
+  regime_atr_high_q: 0.88
+  non_overlapping_trades: true
+  purge_embargo: true
+  prefer_relative_features: true
+  use_meta_labeling: false
+  use_meta_labeling_by_tf:
+    M1: true
+    M5: true
+    M15: true
+    M30: true
+    H1: true
+    H4: false
+  max_fold_trade_rate: 0.22
+  nested_deploy_tune: true
+  deploy_liquidity_rescue: true
+  require_val_test_consistency: true
+  val_test_sharpe_gap_max: 2.0
+  min_median_fold_val_sharpe: -0.5
+  apply_oos_sparsify: false
+  deploy_from_last_window: true
+  gate_on_deploy_holdout: true
+  min_deploy_holdout_sharpe: 0.0
+  min_deploy_holdout_trades: 12
+  min_deploy_holdout_trades_floor: 8
+  min_reliable_deploy_trades: 10
+  fail_on_sparse_deploy: true
+  fail_on_filter_driven_edge: true
+  dq_gate_enabled: true
+  dq_gate_hard: true
+  dq_gate_min_score: 55
+  dq_min_rows_by_tf:
+    M1: 8000
+    M5: 4000
+    M15: 2500
+    M30: 1800
+    H1: 1200
+    H4: 600
+  min_val_trades_per_fold: 12
+  min_val_trades_by_tf:
+    M1: 20
+    M5: 20
+    M15: 18
+    M30: 15
+    H1: 12
+    H4: 8
+  min_liquid_val_fold_frac: 0.4
+  policy_min_agree_folds: 3
+  nested_hp_search: true
+  nested_hp_trials: 8
+  nested_hp_compare_baselines: true
+  nested_hp_allow_family_switch: false
+  dynamic_execution_costs: true
+  vol_slippage_k: 1.25
+  validation_mode: expanding
+  rolling_train_size: null
+  rolling_test_size: null
+  latency_bars: 1
+  execution_delay_bars: 0
+  use_ensemble: false
+  fail_on_regime_unstable: true
+  fail_on_weak_expectancy: true
+  min_expectancy: 0.0
+  fail_on_high_pbo: false
+  max_pbo: 0.55
+  regime_trend_window: 48
+  regime_eval_vol_low_q: 0.3
+  regime_eval_vol_high_q: 0.7
+  regime_min_bars: 40
+  # --- Enterprise Learning Platform (e4-v16 Research Factory) ---
+  data_intel_hard: false
+  data_intel_min_score: 55
+  feature_intelligence_enabled: true
+  feature_corr_threshold: 0.92
+  label_quality_enabled: true
+  label_quality_hard: false
+  label_quality_min_score: 45
+  label_noise_cv_splits: 3
+  label_max_noise_score: 0.65
+  feature_explainability_enabled: true
+  shap_enabled: true
+  shap_max_rows: 600
+  permutation_importance_enabled: true
+  permutation_n_repeats: 4
+  fail_on_unstable_features: false
+  nested_hp_per_fold: true
+  nested_hp_outer_folds: 3
+  nested_hp_objective: financial_proxy
+  nested_hp_allow_family_switch: true
+  prefer_ensemble_on_conflict: true
+  use_ensemble_on_conflict: true
+  model_zoo_financial_proxy: true
+  challenger_min_score_delta: 0.05
+  challenger_min_sharpe_delta: 0.05
+  # --- Research Factory / v16 Intelligent Upgrades ---
+  barrier_sweep_enabled: true
+  barrier_sweep_min_gain: 0.02
+  label_cleaning_enabled: true
+  label_clean_noise_trigger: 0.35
+  label_clean_shrink: 0.65
+  auto_drop_unstable_features: true
+  fail_on_fold_unstable: true
+  fold_stability_max_iqr: 4.0
+  fold_stability_min_pos_frac: 0.6
+  fail_on_expectancy_below_cost: true
+  expectancy_cost_multiple: 1.0
+  fail_on_crisis_holdout_weak: true
+  min_crisis_holdout_sharpe: -0.5
+  fail_on_recent_holdout_weak: false
+  min_recent_holdout_sharpe: 0.0
+  recent_holdout_frac: 0.12
+  crisis_holdout_frac: 0.15
+  fail_on_trade_rate_saturated: false
+  stress_spread_shock: 2.0
+  stress_noise_sigma: 0.0008
+  stress_drop_frac: 0.12
+  stress_latency_extra: 2
+  stress_gap_shock: 0.0015
+  quarantine_h4_confirm: true
+  quarantine_confirm_tfs:
+  - H4
+  retrain_drift_threshold: 0.25
+  research_stop_min_runs: 3
+  cpcv_n_groups: 6
+  cpcv_n_test_groups: 2
+  cpcv_max_paths: 12
+  # Set validation_mode: cpcv_lite for promotion-grade diversity (slower).
+  # Or enable use_promotion_validation_mode to auto-switch to promotion_validation_mode.
+  promotion_validation_mode: cpcv_lite
+  use_promotion_validation_mode: false
+  confidence_sizing_enabled: true
+  confidence_sizing_base: 1.0
+  confidence_sizing_max: 1.5
+  confidence_sizing_min: 0.25
+  model_zoo_enabled: true
+  model_zoo_max_models: 8
+  monte_carlo_paths: 400
+  fail_on_stress_fragile: true
+  min_stress_worst_sharpe: -1.0
+  fail_on_monte_carlo_unstable: false
+  fail_on_low_live_readiness: false
+  min_live_readiness: 55
+  apply_self_optimize: true
+  fail_h4_near_chance: true
+  session_min_trades: 8
+  iterative_max_experiments: 5
+  iterative_ci_delta: 0.15
+  iterative_patience: 2
+  kpi_sharpe_ci_low: 1.5
+  sharpe_ann_cap: daily
+  bootstrap_sharpe_ci: true
+  bootstrap_sharpe_samples: 400
+  min_sharpe_ci_low: -0.25
+  fail_on_weak_sharpe_ci: true
+  min_auc_for_live: 0.515
+  min_active_fold_frac: 0.4
+  min_oos_trade_rate: 0.012
+  target_trade_rate: 0.06
+  target_trade_rate_by_tf:
+    M1: 0.035
+    M5: 0.055
+    M15: 0.09
+    M30: 0.08
+    H1: 0.07
+    H4: 0.08
+  short_edge_multiple: 1.25
+  short_edge_multiple_by_tf:
+    M1: 1.45
+    M5: 1.35
+    M15: 1.12
+    M30: 1.15
+    H1: 1.25
+    H4: 1.3
+  max_train_bars: 10000
+  max_train_bars_by_tf:
+    M1: 45000
+    M5: 28000
+    M15: 18000
+    M30: 12000
+    H1: 10000
+    H4: 4000
+  min_sharpe_ratio: 0.25
+  max_drawdown_threshold: 0.25
+  min_trades_oos: 20
+  require_beat_buy_hold: true
+  commission_per_lot: 7.0
+  spread_pips: 30.0
+  slippage_pips: 5.0
+  min_rows: 80
+  default_symbols:
+  - XAUUSD
+  default_timeframes:
+  - M1
+  - M5
+  - M15
+  - M30
+  - H1
+  - H4
+  deep_learning:
+    artifact_name: LLModel
+    base_timeframe: H1
+    sequence_length: 48
+    max_rows_per_timeframe: 12000
+    hidden_dim: 96
+    attention_heads: 4
+    dropout: 0.2
+    epochs: 12
+    batch_size: 64
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    min_rows: 400
+    decision_threshold: 0.62
+    hold_threshold: 0.4
+    directional_edge: 0.15
+    context_features:
+    - session
+    - vol_regime
+    - pat_bias
+    - pat_strength
+    - trend_strength
+    - chart_pattern_score
+    - structure_hh_hl
+    - dist_to_support
+    - dist_to_resist
+engine5_live:
+  mode: paper
+  symbols:
+  - XAUUSD
+  timeframe: H1
+  prefer_llmodel: false
+  prefer_final_model: true
+  use_training_trade_policy: true
+  final_model_any_timeframe: false
+  multi_tf_fusion: true
+  multi_tf_fusion_mode: weighted_consensus
+  multi_tf_min_agree: 1
+  multi_tf_confirm: true
+  multi_tf_mode: soft_veto
+  veto_opposite_htf: true
+  min_confirm_agree: 1
+  confirm_timeframes:
+  - H4
+  - H1
+  - M30
+  confirm_by_primary_tf:
+    M1:
+    - M5
+    - M15
+    - H1
+    M5:
+    - M15
+    - M30
+    - H1
+    M15:
+    - M30
+    - H1
+    - H4
+    M30:
+    - H1
+    - H4
+    H1:
+    - H4
+    H4:
+    - D1
+  confidence_threshold: 0.52
+  directional_decision: true
+  directional_rel_threshold: 0.55
+  min_side_probability: 0.2
+  directional_edge: 0.12
+  risk_per_trade_pct: 0.35
+  daily_loss_limit_pct: 3.0
+  weekly_loss_limit_pct: 7.0
+  max_open_positions: 20
+  max_exposure_pct: 8.0
+  count_atis_positions_only: true
+  max_entries_per_cycle: 8
+  scale_in_when_tight_spread: true
+  use_live_spread_filter: false
+  max_entry_spread_pips: 12.0
+  tight_spread_pips: 12.0
+  stop_loss_atr_multiplier: 1.5
+  take_profit_atr_multiplier: 2.5
+  retrain_interval_days: 7
+  kill_switch: false
+web:
+  host: 127.0.0.1
+  port: 8787
+  title: ATIS Gold Desk
+logging:
+  level: INFO
+  json_logs: true
+  log_dir: logs

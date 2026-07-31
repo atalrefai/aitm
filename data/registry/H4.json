@@ -1,0 +1,1328 @@
+{
+  "timeframe": "H4",
+  "updated_at": "2026-07-31T11:18:50.638737+00:00",
+  "symbols": {
+    "XAUUSD": {
+      "raw": {
+        "first_available_ts": "2023-07-31T00:00:00+00:00",
+        "last_updated_ts": "2026-07-31T04:00:00+00:00",
+        "last_run_status": "success",
+        "last_run_at": "2026-07-31T09:43:13.892190+00:00",
+        "row_count": 4647,
+        "checksum": "c2c292e843401d2ca532f0431a3722c4",
+        "version_hash": "01839bfcf7a87d26",
+        "extra_json": "{\"gaps\": [{\"from\": \"2024-12-24T20:00:00+00:00\", \"to\": \"2024-12-26T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}, {\"from\": \"2024-12-31T20:00:00+00:00\", \"to\": \"2025-01-02T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}, {\"from\": \"2025-12-31T20:00:00+00:00\", \"to\": \"2026-01-02T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}], \"resolved_symbol\": \"XAUUSD@\"}"
+      },
+      "clean": {
+        "first_available_ts": "2023-07-31T00:00:00+00:00",
+        "last_updated_ts": "2026-07-31T04:00:00+00:00",
+        "last_run_status": "success",
+        "last_run_at": "2026-07-31T09:43:20.228354+00:00",
+        "row_count": 4650,
+        "checksum": "388da032f5142c8ecd59125c81c36dcb",
+        "version_hash": null,
+        "extra_json": "{\"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0}"
+      },
+      "features": {
+        "first_available_ts": "2023-07-31T00:00:00+00:00",
+        "last_updated_ts": "2026-07-31T04:00:00+00:00",
+        "last_run_status": "success",
+        "last_run_at": "2026-07-31T10:23:03.653339+00:00",
+        "row_count": 4650,
+        "checksum": "5652309396985f89ec5403ea62f48092",
+        "version_hash": null,
+        "extra_json": "{\"feature_count\": 178}"
+      }
+    }
+  },
+  "audit": [
+    {
+      "ts": "2026-07-29T04:02:46.289740+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "EURUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"EURUSD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:03:03.607310+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "GBPUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"GBPUSD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:03:21.391389+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "USDJPY",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDJPY\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:03:37.712050+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "AUDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"AUDUSD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:03:55.628044+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "USDCAD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCAD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:11.392650+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "USDCHF",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCHF\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:28.807737+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "NZDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"NZDUSD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4659, \"rows_written\": 4659, \"rows_total\": 4659, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:34.389161+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"backfill\", \"rows_fetched\": 4634, \"rows_written\": 4634, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:35.408560+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "EURUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"EURUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 65, \"gaps_dropped\": 38, \"quality_score\": 0.9778732545649839, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:36.326901+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "GBPUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"GBPUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 44, \"gaps_dropped\": 38, \"quality_score\": 0.9823845327604727, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:37.228923+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "USDJPY",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDJPY\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 63, \"gaps_dropped\": 38, \"quality_score\": 0.9783029001074114, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:38.082544+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "AUDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"AUDUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 39, \"gaps_dropped\": 38, \"quality_score\": 0.9834586466165414, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:38.916369+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "USDCAD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCAD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 44, \"gaps_dropped\": 38, \"quality_score\": 0.9823845327604727, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:39.753048+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "USDCHF",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCHF\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 54, \"gaps_dropped\": 38, \"quality_score\": 0.9802363050483351, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:40.576172+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "NZDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"NZDUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"missing_filled\": 0, \"outliers_flagged\": 29, \"gaps_dropped\": 38, \"quality_score\": 0.9856068743286789, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:04:41.834845+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4637, \"rows_total\": 4637, \"missing_filled\": 3, \"outliers_flagged\": 93, \"gaps_dropped\": 56, \"quality_score\": 0.9678671554884624, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:05:30.200674+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "EURUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"EURUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:06:22.472903+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "GBPUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"GBPUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:07:15.030515+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "USDJPY",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDJPY\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:08:07.305844+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "AUDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"AUDUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:08:59.143879+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "USDCAD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCAD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:09:51.100975+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "USDCHF",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"USDCHF\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:10:43.236553+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "NZDUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"NZDUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4655, \"rows_total\": 4655, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:11:34.403300+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4637, \"rows_total\": 4637, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:28:51.308429+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:28:52.310771+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:28:56.061241+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:37:10.844253+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260729T043710Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-29T04:37:32.086653+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:37:33.028300+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:37:36.886494+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 53, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:43:03.738232+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4637, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:44:28.561170+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:44:39.308169+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:44:49.877014+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:44:53.723150+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260729T044453Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-29T04:45:01.403131+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:45:13.226676+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:45:28.869887+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:46:44.137141+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T04:47:00.689746+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260729T044700Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-29T04:56:13.536943+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260729T045613Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-29T05:00:24.872485+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260729T050024Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-29T05:54:38.314552+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:54:39.263385+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:54:43.726448+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:55:57.997411+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:58:27.363003+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:58:28.339067+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T05:58:32.776117+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:04:21.689039+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4634, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:04:22.607440+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:04:26.546501+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:04:36.544994+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:05:14.260301+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:05:36.646248+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:06:03.001833+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T06:06:11.486767+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4637, \"feature_count\": 89, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:16:27.829985+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 3, \"rows_written\": 1, \"rows_total\": 4635, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:16:29.454798+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 1, \"rows_total\": 4638, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:16:35.585381+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 1, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:20:03.906534+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:29:13.418055+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:50:00.290133+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4635, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:50:01.454697+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:50:08.001440+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:50:29.288002+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:59:33.779507+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:59:45.514886+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T10:59:52.347299+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:00:55.514559+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:07:35.733429+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:13:06.408919+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4635, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:13:08.561983+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:13:23.884384+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-29T11:21:41.796963+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4638, \"rows_total\": 4638, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-29T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T07:55:27.910098+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 7, \"rows_written\": 5, \"rows_total\": 4640, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T00:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T07:56:09.462006+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 5, \"rows_total\": 4643, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T00:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:00:56.991972+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 3, \"rows_written\": 1, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:01:43.856428+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 1, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:04:58.210981+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:05:23.505839+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 6, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:05:24.537054+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:07:15.119519+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:13:32.542920+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:14:14.586901+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:16:14.008164+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:16:34.125100+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:17:19.013889+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:18:51.534386+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T08:27:03.921674+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:09:53.748119+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:10:02.898108+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:11:00.053184+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:18:02.613347+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:49:59.087862+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4641, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:50:05.398380+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:50:53.063709+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T09:51:32.405288+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4644, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-30T11:04:26.861155+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T110426Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:17:54.119656+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T111754Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:24:44.469970+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T112444Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:26:39.218536+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T112639Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:28:27.192387+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T112827Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:36:42.250095+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T113642Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:39:06.580176+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T113906Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:41:38.644370+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T114138Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:43:41.687537+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T114341Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:52:50.921298+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T115250Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:55:37.657678+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T115537Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T11:57:56.815510+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T115756Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-30T12:02:56.019167+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260730T120255Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T02:47:06.085685+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T024706Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T02:49:26.479296+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T024926Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T02:58:41.108235+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T025841Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T03:05:33.993888+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T030533Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T03:12:35.029261+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 6, \"rows_written\": 4, \"rows_total\": 4645, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T20:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T03:12:53.733746+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4, \"rows_total\": 4648, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T20:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T03:13:53.765440+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4, \"rows_total\": 4648, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T20:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T03:20:24.774730+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T032024Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T03:34:17.406404+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4648, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-30T20:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T03:49:24.836037+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T034924Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:01:13.184199+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T040113Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:04:20.022995+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T040419Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:13:24.112244+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T041324Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:22:15.127756+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T042215Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:34:39.029425+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T043439Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:36:52.897021+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T043652Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:38:35.625627+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T043835Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:39:25.186245+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T043925Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:40:17.010469+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044016Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:41:41.579078+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044141Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:42:31.401662+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044231Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:43:18.021722+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044318Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T04:44:34.566309+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044434Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:48:59.055970+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T044859Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:54:29.213059+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T045429Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T04:55:57.955948+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T045557Z_9ffc82e4\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-07-31T05:03:36.569114+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T050336Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T05:05:37.498603+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T050537Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T05:24:53.947728+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T052453Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T05:28:08.752121+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T052808Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T07:13:35.971522+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T071335Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T07:29:17.025614+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T072917Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T07:32:23.385242+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T073223Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T08:05:37.248840+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T080537Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T08:17:41.437871+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T081741Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T09:12:45.537711+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T091245Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T09:34:49.893895+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 4, \"rows_written\": 2, \"rows_total\": 4647, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:34:56.469979+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 2, \"rows_total\": 4650, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:35:46.307853+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 2, \"rows_total\": 4650, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:38:59.452008+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4647, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:39:07.718426+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4650, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:39:56.554683+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4650, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:43:13.895758+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 2, \"rows_written\": 0, \"rows_total\": 4647, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:43:20.232050+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4650, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T09:44:09.307209+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4650, \"feature_count\": 156, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T10:23:03.732066+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 0, \"rows_total\": 4650, \"feature_count\": 178, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-07-31T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-07-31T10:39:23.067961+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T103923Z_9ffc82e4\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T11:03:00.877040+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T110300Z_85ce2764\", \"passed\": false}"
+    },
+    {
+      "ts": "2026-07-31T11:18:50.638115+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"version\": \"20260731T111850Z_85ce2764\", \"passed\": false}"
+    }
+  ]
+}
