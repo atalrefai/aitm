@@ -361,7 +361,24 @@ def compute_features(df: pd.DataFrame, config: dict[str, Any] | None = None) -> 
 
     if cfg.get("patterns", {}).get("structural", True):
         struct = swing_support_resistance(out)
-        charts = structural_patterns(out)
+        score_weights = cfg.get("patterns", {}).get("chart_score_weights")
+        if not isinstance(score_weights, dict):
+            score_weights = None
+            # Prefer prior-run rankings when symbol/tf known (safe ±1 fallback otherwise)
+            sym = cfg.get("symbol")
+            tf = cfg.get("timeframe")
+            if sym and tf:
+                try:
+                    from atis.shared.feature_engine.patterns import chart_score_weights_from_rankings
+                    from atis.shared.pattern_store import load_section
+
+                    ranks = load_section(str(sym), str(tf), "rankings") or {}
+                    items = ranks.get("by_quality") or ranks.get("engine4_recommended") or []
+                    if items:
+                        score_weights = chart_score_weights_from_rankings(items)
+                except Exception:
+                    score_weights = None
+        charts = structural_patterns(out, score_weights=score_weights)
         out = pd.concat([out, struct, charts], axis=1)
 
     if cfg.get("patterns", {}).get("compound", True):

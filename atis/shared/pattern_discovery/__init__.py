@@ -34,10 +34,18 @@ from atis.shared.pattern_discovery.checkpoint import (
     stage_done,
 )
 from atis.shared.pattern_discovery.deep_miner import attach_signals_to_frame, discover_deep_patterns
-from atis.shared.pattern_discovery.relations import build_pattern_relations
+from atis.shared.pattern_discovery.relations import (
+    build_pattern_relations,
+    pattern_relation_columns,
+    relations_has_graph,
+)
 from atis.shared.pattern_discovery.validation import gate_pattern
 from atis.shared.pattern_kb import PatternKnowledgeBase
-from atis.shared.pattern_store import save_timeframe_pattern_bundle, write_discovery_report
+from atis.shared.pattern_store import (
+    load_section,
+    save_timeframe_pattern_bundle,
+    write_discovery_report,
+)
 
 logger = get_logger("atis.pattern_discovery")
 
@@ -75,6 +83,66 @@ def _horizon_for_tf(tf: str) -> int:
     return int(mapping.get(tf, 4))
 
 
+def _load_htf_context_arrays(
+    symbol: str,
+    timeframe: str,
+    local_ts: pd.Series,
+) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Causal HTF pat_bias / chart_pattern_score aligned to local timestamps (merge_asof backward)."""
+    try:
+        from atis.engines.engine4_training.data_sources import higher_timeframes_for
+    except Exception:
+        return None, None
+
+    htfs = higher_timeframes_for(timeframe)
+    if not htfs:
+        return None, None
+
+    ts = pd.to_datetime(local_ts, utc=True, errors="coerce")
+    n = len(ts)
+    if n == 0 or ts.isna().all():
+        return None, None
+    local = pd.DataFrame({"timestamp": ts, "_ord": np.arange(n)})
+
+    for htf in htfs:
+        feat_path = get_path("data_features") / symbol / htf / "features.parquet"
+        if not feat_path.exists():
+            continue
+        try:
+            # Probe columns cheaply
+            probe = pd.read_parquet(feat_path)
+            use_cols = [c for c in ("timestamp", "pat_bias", "chart_pattern_score") if c in probe.columns]
+            if "timestamp" not in use_cols or len(use_cols) < 2:
+                continue
+            hdf = probe[use_cols].copy()
+            hdf["timestamp"] = pd.to_datetime(hdf["timestamp"], utc=True, errors="coerce")
+            hdf = hdf.dropna(subset=["timestamp"]).sort_values("timestamp")
+            if hdf.empty:
+                continue
+            merged = pd.merge_asof(
+                local.sort_values("timestamp"),
+                hdf,
+                on="timestamp",
+                direction="backward",
+            ).sort_values("_ord")
+            bias_arr = (
+                merged["pat_bias"].to_numpy(dtype=float)
+                if "pat_bias" in merged.columns
+                else None
+            )
+            chart_arr = (
+                merged["chart_pattern_score"].to_numpy(dtype=float)
+                if "chart_pattern_score" in merged.columns
+                else None
+            )
+            if bias_arr is not None or chart_arr is not None:
+                return bias_arr, chart_arr
+        except Exception as exc:
+            logger.debug("HTF context load failed for %s/%s: %s", symbol, htf, exc)
+            continue
+    return None, None
+
+
 def _evaluate_pattern_vectorized(
     df: pd.DataFrame,
     col: str,
@@ -83,6 +151,9 @@ def _evaluate_pattern_vectorized(
     horizon: int,
     max_events: int = MAX_EVENTS_PER_PATTERN,
     run_gates: bool = True,
+    timeframe: str | None = None,
+    htf_bias: np.ndarray | None = None,
+    htf_chart: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Vectorized evaluation + optional statistical validation gates."""
     empty = {
@@ -105,6 +176,8 @@ def _evaluate_pattern_vectorized(
         "strength": 0.0,
         "confidence": 0.0,
         "approved": False,
+        "soft_promoted": False,
+        "htf_confirm": None,
         "validation": None,
         "last_seen_ts": None,
         "events": [],
@@ -154,10 +227,11 @@ def _evaluate_pattern_vectorized(
     validation = None
     approved = False
     soft_promoted = False
+    htf_confirm = None
     quality = 0.0
     metrics: dict[str, Any] = {}
     if run_gates and evaluated:
-        validation = gate_pattern(rets, bias=bias)
+        validation = gate_pattern(rets, bias=bias, timeframe=timeframe)
         approved = bool(validation.get("approved"))
         soft_promoted = bool(validation.get("soft_promoted"))
         quality = float(validation.get("quality_score") or 0.0)
@@ -166,6 +240,29 @@ def _evaluate_pattern_vectorized(
         if metrics.get("success_rate") is not None:
             success_rate = float(metrics["success_rate"])
             successes = int(metrics.get("successes") or successes)
+
+        # HTF directional confirmation before soft/hard promote
+        if soft_promoted or approved:
+            from atis.shared.pattern_discovery.validation import confirm_htf_bias
+
+            hit_valid = hit_idx[valid] if evaluated else hit_idx
+            hb = htf_bias[hit_valid] if htf_bias is not None and len(htf_bias) == n else None
+            hc = htf_chart[hit_valid] if htf_chart is not None and len(htf_chart) == n else None
+            htf = confirm_htf_bias(bias=bias, htf_bias_values=hb, htf_chart_scores=hc)
+            htf_confirm = htf.get("confirmed")
+            if validation is not None:
+                validation = {**validation, "htf_confirm": htf}
+            if htf_confirm is False:
+                soft_promoted = False
+                # Hard approve also requires HTF agreement when HTF is available
+                if approved:
+                    approved = False
+                    reasons = list(validation.get("reject_reasons") or [])
+                    if "htf_bias_mismatch" not in reasons:
+                        reasons.append("htf_bias_mismatch")
+                    validation["reject_reasons"] = reasons
+                    validation["approved"] = False
+                    validation["soft_promoted"] = False
 
     sample_idx = hit_idx[-max_events:]
     ts_col = (
@@ -220,6 +317,7 @@ def _evaluate_pattern_vectorized(
         "confidence": float(conf),
         "approved": approved,
         "soft_promoted": soft_promoted,
+        "htf_confirm": htf_confirm,
         "validation": validation,
         "last_seen_ts": last_ts,
         "events": events,
@@ -253,6 +351,7 @@ def _stat_row(sym: str, tf: str, col: str, bias: str, ev: dict[str, Any], condit
         "confidence": ev["confidence"],
         "approved": ev.get("approved"),
         "soft_promoted": ev.get("soft_promoted"),
+        "htf_confirm": ev.get("htf_confirm"),
         "validation": ev.get("validation"),
         "best_timeframe": tf,
         "last_seen_ts": ev["last_seen_ts"],
@@ -445,6 +544,9 @@ def run_pattern_discovery(
             )
 
             horizon = forward_horizon or _horizon_for_tf(tf)
+            htf_bias_arr, htf_chart_arr = _load_htf_context_arrays(
+                sym, tf, df["timestamp"] if "timestamp" in df.columns else pd.Series(range(len(df)))
+            )
             tf_stats: list[dict[str, Any]] = []
             tf_events: list[dict[str, Any]] = []
             n_cols = max(1, len(pat_cols))
@@ -494,6 +596,9 @@ def run_pattern_discovery(
                         bias=bias,
                         horizon=horizon,
                         max_events=MAX_EVENTS_PER_PATTERN,
+                        timeframe=tf,
+                        htf_bias=htf_bias_arr,
+                        htf_chart=htf_chart_arr,
                     )
                     if ev["occurrences"] > 0:
                         row = _stat_row(
@@ -581,6 +686,9 @@ def run_pattern_discovery(
                         item["key"],
                         bias=bias,
                         horizon=horizon,
+                        timeframe=tf,
+                        htf_bias=htf_bias_arr,
+                        htf_chart=htf_chart_arr,
                     )
                     item.update(
                         {
@@ -626,7 +734,7 @@ def run_pattern_discovery(
             new_patterns: list[dict[str, Any]] = []
             if not stage_done(state, "deep_newn"):
                 existing_new = {c for c in df.columns if c.startswith("New")}
-                for d in kb.list_discovered(500):
+                for d in kb.list_new_patterns(symbol=sym, timeframe=tf, limit=500):
                     if str(d.get("compound_key", "")).startswith("New"):
                         existing_new.add(d["compound_key"])
                 deep = discover_deep_patterns(
@@ -643,6 +751,9 @@ def run_pattern_discovery(
                         item["key"],
                         bias=item.get("bias") or "neutral",
                         horizon=horizon,
+                        timeframe=tf,
+                        htf_bias=htf_bias_arr,
+                        htf_chart=htf_chart_arr,
                     )
                     regime = "trend" if (item.get("kind") in {"momentum", "sequential_compound"}) else "mixed"
                     payload = {
@@ -658,6 +769,7 @@ def run_pattern_discovery(
                         "strength": ev.get("strength"),
                         "approved": bool(ev.get("approved")),
                         "soft_promoted": bool(ev.get("soft_promoted")),
+                        "htf_confirm": ev.get("htf_confirm"),
                         "validation": ev.get("validation"),
                         "best_timeframe": tf,
                         "best_market_regime": regime,
@@ -718,21 +830,13 @@ def run_pattern_discovery(
                 f"NewN: {len(new_patterns)} · معتمد {sum(1 for p in new_patterns if p.get('approved'))} · {sym}/{tf}",
             )
 
-            # Relations graph
+            # Relations graph (rebuild if prior resume saved an empty shell)
             relations: dict[str, Any] = {}
-            if not stage_done(state, "relations"):
-                rel_cols = [
-                    c
-                    for c in df.columns
-                    if (
-                        c.startswith("pat_")
-                        or c.startswith("cmp_")
-                        or c.startswith("disc_")
-                        or c.startswith("New")
-                    )
-                    and c not in {"pat_bias", "pat_strength"}
-                ]
-                relations = build_pattern_relations(df, rel_cols)
+            if stage_done(state, "relations"):
+                relations = load_section(sym, tf, "relations") or {}
+            if not relations_has_graph(relations):
+                rel_cols = pattern_relation_columns(df)
+                relations = build_pattern_relations(df, rel_cols, labels=labels)
                 mark_stage(state, "relations", edges=len(relations.get("edges") or []))
                 save_checkpoint(sym, tf, state)
 
@@ -842,11 +946,8 @@ def export_pattern_json_from_kb(
             stats = kb.list_stats(sym, tf, min_occurrences=1, limit=5000)
             compounds = []
             new_patterns = []
-            for d in kb.list_discovered(500):
-                if d.get("timeframe") and d.get("timeframe") != tf:
-                    continue
-                if d.get("symbol") and d.get("symbol") != sym:
-                    continue
+
+            def _discovered_to_item(d: dict[str, Any]) -> dict[str, Any]:
                 legs = []
                 try:
                     legs = json.loads(d.get("legs_json") or "[]")
@@ -857,9 +958,17 @@ def export_pattern_json_from_kb(
                     meta = json.loads(d.get("meta_json") or "{}")
                 except Exception:
                     meta = {}
-                item = {
-                    "key": d.get("compound_key"),
-                    "name": d.get("name"),
+                key = d.get("compound_key")
+                raw_name = d.get("name") or key
+                desc = meta.get("description")
+                # Prefer descriptive display when name is bare NewN
+                if desc and str(raw_name).startswith("New") and "—" not in str(raw_name):
+                    display = f"{raw_name} — {desc}"
+                else:
+                    display = raw_name
+                return {
+                    "key": key,
+                    "name": display,
                     "legs": legs,
                     "lift": d.get("lift"),
                     "occurrences": d.get("occurrences"),
@@ -868,6 +977,8 @@ def export_pattern_json_from_kb(
                     "conditions": d.get("conditions"),
                     "bias": meta.get("bias") or "neutral",
                     "approved": meta.get("approved"),
+                    "soft_promoted": meta.get("soft_promoted"),
+                    "htf_confirm": meta.get("htf_confirm"),
                     "quality_score": meta.get("quality_score"),
                     "description": meta.get("description"),
                     "mathematical_rules": meta.get("mathematical_rules"),
@@ -880,10 +991,19 @@ def export_pattern_json_from_kb(
                     "best_market_regime": meta.get("best_market_regime"),
                     "validation": meta.get("validation"),
                 }
+
+            # Compounds (non-New) — lift-ranked is fine
+            for d in kb.list_discovered(500, symbol=sym, timeframe=tf, include_null_lift=False):
+                item = _discovered_to_item(d)
+                if str(item["key"] or "").startswith("New"):
+                    continue
+                compounds.append(item)
+
+            # NewN explicitly — never drop null-lift metadata
+            for d in kb.list_new_patterns(symbol=sym, timeframe=tf, limit=500):
+                item = _discovered_to_item(d)
                 if str(item["key"] or "").startswith("New"):
                     new_patterns.append(item)
-                else:
-                    compounds.append(item)
 
             events: list[dict[str, Any]] = []
             with kb._conn() as con:

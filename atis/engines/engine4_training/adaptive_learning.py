@@ -112,6 +112,33 @@ def _sample_lgb_params(rng: np.random.Generator, base: dict[str, Any], *, regula
     depth_lo, depth_hi = (2, 4) if regularize else (3, 5)
     leaves_lo, leaves_hi = (8, 16) if regularize else (12, 31)
     child_lo, child_hi = (120, 280) if regularize else (60, 200)
+    # Honour self-opt / user capacity floors so nested HP cannot undo regularization.
+    try:
+        cap_depth = int(base.get("lgb_max_depth", depth_hi) or depth_hi)
+        depth_hi = min(depth_hi, max(2, cap_depth))
+        depth_lo = min(depth_lo, depth_hi)
+    except (TypeError, ValueError):
+        pass
+    try:
+        floor_child = int(base.get("lgb_min_child_samples", child_lo) or child_lo)
+        child_lo = max(child_lo, floor_child)
+        child_hi = max(child_hi, child_lo)
+    except (TypeError, ValueError):
+        pass
+    lam_choices = [2.0, 3.5, 5.0, 6.5, 8.0] if regularize else [1.5, 2.5, 3.5, 5.0]
+    try:
+        floor_lam = float(base.get("lgb_reg_lambda", 0) or 0)
+        if floor_lam > 0:
+            lam_choices = [x for x in lam_choices if x + 1e-9 >= floor_lam] or [floor_lam]
+    except (TypeError, ValueError):
+        pass
+    col_choices = [0.4, 0.48, 0.55, 0.65]
+    try:
+        cap_col = float(base.get("lgb_colsample", 0) or 0)
+        if 0 < cap_col < 1:
+            col_choices = [x for x in col_choices if x <= cap_col + 1e-9] or [cap_col]
+    except (TypeError, ValueError):
+        pass
     return {
         "lgb_estimators": int(rng.choice([120, 160, 200, 240, 280])),
         "lgb_learning_rate": float(rng.choice([0.018, 0.022, 0.028, 0.035])),
@@ -119,9 +146,9 @@ def _sample_lgb_params(rng: np.random.Generator, base: dict[str, Any], *, regula
         "lgb_num_leaves": int(rng.integers(leaves_lo, leaves_hi + 1)),
         "lgb_min_child_samples": int(rng.integers(child_lo, child_hi + 1)),
         "lgb_subsample": float(rng.choice([0.65, 0.7, 0.75, 0.8])),
-        "lgb_colsample": float(rng.choice([0.4, 0.48, 0.55, 0.65])),
+        "lgb_colsample": float(rng.choice(col_choices)),
         "lgb_reg_alpha": float(rng.choice([0.3, 0.5, 0.85, 1.2])),
-        "lgb_reg_lambda": float(rng.choice([2.0, 3.5, 5.0, 6.5, 8.0] if regularize else [1.5, 2.5, 3.5, 5.0])),
+        "lgb_reg_lambda": float(rng.choice(lam_choices)),
         "lgb_early_stopping": bool(base.get("lgb_early_stopping", True)),
         "lgb_early_stopping_rounds": int(
             max(30, int(base.get("lgb_early_stopping_rounds", 50)) + (20 if regularize else 0))
@@ -169,22 +196,32 @@ def nested_hyperparameter_search(
     y_tr, y_va = y_train[:cut], y_train[cut:]
     w_tr = sample_weight[:cut] if sample_weight is not None else None
     rng = np.random.default_rng(seed + hash(str(timeframe)) % 10007)
-    regularize = str(timeframe).upper() in {"H1", "H4", "M1"} or bool(cfg.get("force_regularize_hp", False))
+    regularize = (
+        str(timeframe).upper() in {"H1", "H4", "M1", "M5"}
+        or bool(cfg.get("force_regularize_hp", False))
+        or bool(cfg.get("nested_hp_train_val_gap_penalty", False))
+        or bool(cfg.get("regularize_capacity", False))
+    )
+    prefer_simpler = bool(cfg.get("prefer_simpler_within_epsilon", False)) or regularize
+    simpler_eps = float(cfg.get("simpler_within_epsilon", 0.004) or 0.004)
     obj = str(objective or cfg.get("nested_hp_objective", "financial_proxy")).lower()
 
     def _default_score(model: Any, Xv: np.ndarray, yv: np.ndarray) -> float:
         try:
             pred = model.predict(Xv)
-            acc = float(np.mean(pred == yv)) if len(yv) else 0.0
-            edge = acc - 0.50
             if obj == "accuracy":
-                return edge
-            # financial_proxy: reward directional balance + penalize near-chance hard
-            classes, counts = np.unique(pred, return_counts=True)
-            bal = 0.0
-            if len(counts) >= 2:
-                bal = 1.0 - float(np.max(counts) / max(np.sum(counts), 1))
-            return edge + 0.05 * bal - (0.02 if acc < 0.52 else 0.0)
+                acc = float(np.mean(pred == yv)) if len(yv) else 0.0
+                return acc - 0.50
+            # financial_proxy / expectancy_cost / quality_compound: cost-aware + F1/WR
+            from atis.engines.engine4_training.financial_hpo import financial_proxy_score
+
+            return financial_proxy_score(
+                yv,
+                pred,
+                unit_cost=float(cfg.get("nested_hp_unit_cost", 0.00025)),
+                target_trade_rate=float(cfg.get("target_trade_rate", 0.08) or 0.08),
+                max_trade_rate=float(cfg.get("max_fold_trade_rate", 0.12) or 0.12),
+            )
         except Exception:
             return -1.0
 
@@ -208,7 +245,18 @@ def nested_hyperparameter_search(
 
     best_cfg = dict(cfg)
     best_score = -1e18
+    best_complexity = 1e18
     history: list[dict[str, Any]] = []
+
+    def _complexity(cand: dict[str, Any], fam: str) -> float:
+        if fam == "logistic":
+            return 0.5
+        return (
+            float(cand.get("lgb_max_depth", 4))
+            + 0.01 * max(0.0, 8.0 - float(cand.get("lgb_reg_lambda", 1.0)))
+            + 0.001 * max(0.0, 300 - float(cand.get("lgb_min_child_samples", 80)))
+        )
+
     for fam in families:
         for i, cand in enumerate(candidates if fam == "lightgbm" else candidates[:1]):
             try:
@@ -237,14 +285,23 @@ def nested_hyperparameter_search(
                     model = fit_fn(model, X_tr, y_tr, w_tr, cfg=cand)
                     model_name = "lightgbm"
                 sc = float(score_fn(model, X_va, y_va))
-                # Prefer stronger regularization on H1 when scores are close
+                # Prefer stronger regularization when scores are close
                 if regularize and fam == "lightgbm":
                     sc -= 0.002 * float(cand.get("lgb_max_depth", 4))
+                cx = _complexity(cand, model_name)
                 history.append({"family": model_name, "trial": i, "score": round(sc, 6)})
-                if sc > best_score:
-                    best_score = sc
+                better = sc > best_score + 1e-12
+                tie_simpler = (
+                    prefer_simpler
+                    and abs(sc - best_score) <= simpler_eps
+                    and cx < best_complexity
+                )
+                if better or tie_simpler:
+                    if better:
+                        best_score = sc
                     best_cfg = dict(cand)
                     best_cfg["_nested_model_family"] = model_name
+                    best_complexity = cx
             except Exception as exc:  # pragma: no cover - defensive
                 history.append({"family": fam, "trial": i, "error": str(exc)})
 
@@ -254,6 +311,7 @@ def nested_hyperparameter_search(
         "best_score": round(best_score, 6),
         "best_family": best_cfg.get("_nested_model_family", "lightgbm"),
         "regularize": regularize,
+        "prefer_simpler_within_epsilon": prefer_simpler,
         "objective": obj,
         "history": history[:30],
         "inner_train": int(cut),

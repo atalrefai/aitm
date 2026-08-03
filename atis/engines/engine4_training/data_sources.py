@@ -12,7 +12,12 @@ import pandas as pd
 from atis.config import get_path, load_engine_config
 from atis.shared.data_json import load_timeframe_json
 from atis.shared.data_registry import DataStateRegistry
-from atis.shared.pattern_store import load_section, section_path, load_pattern_signal_matrix
+from atis.shared.pattern_store import (
+    load_pattern_signal_matrix,
+    load_section,
+    relations_has_content,
+    section_path,
+)
 
 
 # Higher→lower hierarchy for causal context injection (merge_asof backward).
@@ -115,6 +120,209 @@ def training_source_meta(symbol: str, timeframe: str) -> dict[str, Any]:
 
 def _safe_mean(values: list[float]) -> float:
     return float(sum(values) / max(1, len(values))) if values else 0.0
+
+
+def _pattern_fire_array(df: pd.DataFrame, key: str) -> np.ndarray | None:
+    if key not in df.columns:
+        return None
+    return pd.to_numeric(df[key], errors="coerce").fillna(0.0).astype(float).to_numpy()
+
+
+def inject_pattern_relation_features(
+    df: pd.DataFrame,
+    relations: dict[str, Any] | None,
+    *,
+    top_co: int = 12,
+    top_prec: int = 16,
+    top_cancel: int = 8,
+    top_seq: int = 8,
+    max_pair_features: int = 40,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Inject causal bar-level features from the pattern relation graph.
+
+    Uses relation *structure* (which pairs matter) from discovery, and only
+    past/current pattern fires on each bar — no future peeking:
+      - co_occurrence: both patterns fire on the same bar
+      - precedes: source fired in the prior lag window, target fires now
+      - cancels: opposing patterns fire together
+      - sequences: top precedes chains as seq hits
+    """
+    meta: dict[str, Any] = {
+        "enabled": True,
+        "injected": [],
+        "skipped_missing_cols": 0,
+        "edges_used": {"co_occurrence": 0, "precedes": 0, "cancels": 0, "sequences": 0},
+    }
+    if df is None or df.empty:
+        meta["enabled"] = False
+        meta["reason"] = "empty_frame"
+        return df, meta
+    if not relations_has_content(relations):
+        meta["enabled"] = False
+        meta["reason"] = "no_relations_graph"
+        return df, meta
+
+    work = df
+    edges = list((relations or {}).get("edges") or [])
+    sequences = list((relations or {}).get("sequences") or [])
+    lag_max = max(1, int((relations or {}).get("lag_max") or 5))
+    injected: list[str] = []
+
+    def _add(name: str, values: np.ndarray) -> None:
+        work[name] = values.astype(float)
+        injected.append(name)
+
+    # Reserve pair budget by relation family so precedes weights cannot starve cancels
+    budget_co = min(top_co, max(4, max_pair_features // 3))
+    budget_prec = min(top_prec, max(6, max_pair_features // 2))
+    budget_cancel = min(top_cancel, max(4, max_pair_features // 5))
+
+    co_edges = [e for e in edges if e.get("relation") == "co_occurrence"][:budget_co]
+    for i, e in enumerate(co_edges):
+        a = _pattern_fire_array(work, str(e.get("source") or ""))
+        b = _pattern_fire_array(work, str(e.get("target") or ""))
+        if a is None or b is None:
+            meta["skipped_missing_cols"] += 1
+            continue
+        _add(f"feat_rel_co_{i}", a * b)
+        meta["edges_used"]["co_occurrence"] += 1
+
+    prec_edges = [e for e in edges if e.get("relation") == "precedes"][:budget_prec]
+    for i, e in enumerate(prec_edges):
+        src = str(e.get("source") or "")
+        tgt = str(e.get("target") or "")
+        a = _pattern_fire_array(work, src)
+        b = _pattern_fire_array(work, tgt)
+        if a is None or b is None:
+            meta["skipped_missing_cols"] += 1
+            continue
+        # Causal: source in [t-lag, t-1] only (shift after rolling max)
+        past = (
+            pd.Series(a)
+            .rolling(lag_max, min_periods=1)
+            .max()
+            .shift(1)
+            .fillna(0.0)
+            .to_numpy(dtype=float)
+        )
+        hit = past * b
+        _add(f"feat_rel_prec_{i}", hit)
+        # Soft lead strength: how recently source fired before target
+        lag_e = max(1, int(e.get("lag_max") or lag_max))
+        recent = (
+            pd.Series(a)
+            .rolling(lag_e, min_periods=1)
+            .sum()
+            .shift(1)
+            .fillna(0.0)
+            .to_numpy(dtype=float)
+        )
+        _add(f"feat_rel_prec_w_{i}", recent * b)
+        meta["edges_used"]["precedes"] += 1
+
+    cancel_edges = [e for e in edges if e.get("relation") == "cancels"][:budget_cancel]
+    for i, e in enumerate(cancel_edges):
+        a = _pattern_fire_array(work, str(e.get("source") or ""))
+        b = _pattern_fire_array(work, str(e.get("target") or ""))
+        if a is None or b is None:
+            meta["skipped_missing_cols"] += 1
+            continue
+        _add(f"feat_rel_cancel_{i}", a * b)
+        meta["edges_used"]["cancels"] += 1
+
+    for i, seq in enumerate(sequences[: max(0, top_seq)]):
+        chain = list(seq.get("sequence") or [])
+        if len(chain) < 2:
+            continue
+        a = _pattern_fire_array(work, str(chain[0]))
+        b = _pattern_fire_array(work, str(chain[1]))
+        if a is None or b is None:
+            meta["skipped_missing_cols"] += 1
+            continue
+        past = (
+            pd.Series(a)
+            .rolling(lag_max, min_periods=1)
+            .max()
+            .shift(1)
+            .fillna(0.0)
+            .to_numpy(dtype=float)
+        )
+        _add(f"feat_rel_seq_{i}", past * b)
+        meta["edges_used"]["sequences"] += 1
+
+    co_cols = [c for c in injected if c.startswith("feat_rel_co_")]
+    prec_cols = [c for c in injected if c.startswith("feat_rel_prec_") and not c.startswith("feat_rel_prec_w_")]
+    cancel_cols = [c for c in injected if c.startswith("feat_rel_cancel_")]
+    seq_cols = [c for c in injected if c.startswith("feat_rel_seq_")]
+
+    if co_cols:
+        _add("feat_rel_co_hit_count", work[co_cols].fillna(0.0).sum(axis=1).to_numpy(dtype=float))
+    else:
+        work["feat_rel_co_hit_count"] = 0.0
+        injected.append("feat_rel_co_hit_count")
+    if prec_cols:
+        _add("feat_rel_prec_hit_count", work[prec_cols].fillna(0.0).sum(axis=1).to_numpy(dtype=float))
+    else:
+        work["feat_rel_prec_hit_count"] = 0.0
+        injected.append("feat_rel_prec_hit_count")
+    if cancel_cols:
+        _add("feat_rel_cancel_hit_count", work[cancel_cols].fillna(0.0).sum(axis=1).to_numpy(dtype=float))
+    else:
+        work["feat_rel_cancel_hit_count"] = 0.0
+        injected.append("feat_rel_cancel_hit_count")
+    if seq_cols:
+        _add("feat_rel_seq_hit_count", work[seq_cols].fillna(0.0).sum(axis=1).to_numpy(dtype=float))
+    else:
+        work["feat_rel_seq_hit_count"] = 0.0
+        injected.append("feat_rel_seq_hit_count")
+
+    work["feat_rel_net_confirm"] = (
+        work["feat_rel_prec_hit_count"].astype(float)
+        + work["feat_rel_co_hit_count"].astype(float)
+        - work["feat_rel_cancel_hit_count"].astype(float)
+    )
+    injected.append("feat_rel_net_confirm")
+
+    # Hub activity: degree-weighted fires of top graph nodes
+    nodes = list((relations or {}).get("nodes") or [])
+    hubs = sorted(nodes, key=lambda n: float(n.get("degree") or 0), reverse=True)[:16]
+    hub_score = np.zeros(len(work), dtype=float)
+    hub_n = 0
+    for node in hubs:
+        arr = _pattern_fire_array(work, str(node.get("id") or ""))
+        if arr is None:
+            continue
+        w = 1.0 + 0.08 * float(node.get("degree") or 0)
+        hub_score += arr * w
+        hub_n += 1
+    work["feat_rel_hub_activity"] = hub_score
+    injected.append("feat_rel_hub_activity")
+    work["feat_rel_graph_active"] = (
+        (
+            work["feat_rel_co_hit_count"].astype(float)
+            + work["feat_rel_prec_hit_count"].astype(float)
+            + work["feat_rel_seq_hit_count"].astype(float)
+        )
+        > 0
+    ).astype(float)
+    injected.append("feat_rel_graph_active")
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for c in injected:
+        if c in seen:
+            continue
+        seen.add(c)
+        uniq.append(c)
+    meta["injected"] = uniq
+    meta["n_injected"] = len(uniq)
+    meta["hub_nodes_used"] = hub_n
+    meta["lag_max"] = lag_max
+    if not any(meta["edges_used"].values()) and hub_n == 0:
+        meta["enabled"] = False
+        meta["reason"] = "no_matching_pattern_columns"
+    return work, meta
 
 
 def _htf_context_from_frame(frame: pd.DataFrame, htf: str) -> pd.DataFrame | None:
@@ -369,6 +577,46 @@ def load_training_frame(symbol: str, timeframe: str) -> tuple[pd.DataFrame, dict
             df["pattern_promoted_bias_score"] = score
     source_meta_injected = injected
 
+    e4_cfg = load_engine_config().get("engine4_training", {}) or {}
+    relations_meta: dict[str, Any] = {"enabled": False, "reason": "disabled"}
+    if bool(e4_cfg.get("pattern_relation_features", True)):
+        rel_sec = load_section(symbol, timeframe, "relations") or {}
+        rebuilt_on_load = False
+        if not relations_has_content(rel_sec):
+            # Build once from the training frame so retrain is not blocked
+            try:
+                from atis.shared.feature_engine.patterns import pattern_labels
+                from atis.shared.pattern_discovery.relations import (
+                    build_pattern_relations,
+                    pattern_relation_columns,
+                )
+                from atis.shared.pattern_store import save_relations_section
+
+                rel_sec = build_pattern_relations(
+                    df, pattern_relation_columns(df), labels=pattern_labels()
+                )
+                if relations_has_content(rel_sec):
+                    save_relations_section(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        relations=rel_sec,
+                        bars_scanned=int(len(df)),
+                    )
+                    rebuilt_on_load = True
+            except Exception as exc:
+                relations_meta = {"enabled": False, "rebuild_error": str(exc)}
+        df, relations_meta = inject_pattern_relation_features(
+            df,
+            rel_sec,
+            top_co=int(e4_cfg.get("pattern_relation_top_co", 12)),
+            top_prec=int(e4_cfg.get("pattern_relation_top_prec", 16)),
+            top_cancel=int(e4_cfg.get("pattern_relation_top_cancel", 8)),
+            top_seq=int(e4_cfg.get("pattern_relation_top_seq", 8)),
+            max_pair_features=int(e4_cfg.get("pattern_relation_max_pair_features", 40)),
+        )
+        if rebuilt_on_load:
+            relations_meta["rebuilt_on_load"] = True
+
     source_meta = {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -404,14 +652,14 @@ def load_training_frame(symbol: str, timeframe: str) -> tuple[pd.DataFrame, dict
             "new_approved_count": len(approved_new),
             "engine4_recommended_count": len(recommended),
             "injected_signal_columns": source_meta_injected,
+            "relation_features": relations_meta,
             "avg_success_rate": _safe_mean(success_vals),
             "avg_confidence": _safe_mean(conf_vals),
             "avg_forward_return": _safe_mean(fwd_vals),
         },
     }
 
-    e4 = load_engine_config().get("engine4_training", {}) or {}
-    if bool(e4.get("cross_tf_features", True)):
+    if bool(e4_cfg.get("cross_tf_features", True)):
         df, mtf_meta = enrich_with_higher_timeframes(df, symbol, timeframe)
         source_meta["cross_tf"] = mtf_meta
         source_meta["row_count"] = int(len(df))

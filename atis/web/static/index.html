@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260803c" />
 </head>
 <body>
   <header class="shell-top">
@@ -34,9 +34,9 @@
 
   <div class="shell">
     <aside class="nav">
-      <button class="nav-btn active" data-tab="train" type="button">التدريب والاختبار</button>
       <button class="nav-btn" data-tab="data" type="button">حالة البيانات</button>
       <button class="nav-btn" data-tab="patterns" type="button">الأنماط والشموع</button>
+      <button class="nav-btn active" data-tab="train" type="button">التدريب والاختبار</button>
       <button class="nav-btn" data-tab="trade" type="button">التداول الآلي</button>
       <button class="nav-btn" data-tab="settings" type="button">الإعدادات</button>
       <button class="nav-btn" data-tab="engines" type="button">المحركات</button>
@@ -49,11 +49,11 @@
         <div class="page-head">
           <div>
             <h1>التدريب والاختبار</h1>
-            <p class="page-desc">تدريب M1 · M5 · M15 · M30 · H1 · H4 مع فصل واضح بين التشغيل الحالي والبطل المحفوظ</p>
+            <p class="page-desc">حدّد الأطر من صناديق التشغيل الحالي ثم درّبها · فصل واضح بين التشغيل الحالي والبطل المحفوظ</p>
           </div>
           <div class="btn-row">
             <button class="btn" id="btn-export-training-html" type="button">تصدير HTML</button>
-            <button class="btn primary" data-run="4" type="button">تدريب كل الأطر الآن</button>
+            <button class="btn primary" data-run="4" type="button" id="btn-train-selected">تدريب الأطر المحددة</button>
           </div>
         </div>
 
@@ -103,7 +103,14 @@
             <h2>التشغيل الحالي</h2>
             <span class="chip" id="current-run-pipeline">pipeline —</span>
           </div>
-          <p class="card-note" id="current-run-meta">لا يوجد تشغيل حديث بعد — اضغط «تدريب كل الأطر الآن».</p>
+          <p class="card-note" id="current-run-meta">حدّد الأطر المراد تدريبها ثم اضغط «تدريب الأطر المحددة».</p>
+          <div class="train-tf-select-bar">
+            <label class="auto-tf-all" for="train-tf-all">
+              <input type="checkbox" id="train-tf-all" checked />
+              تحديد الكل
+            </label>
+            <span class="card-note" id="train-tf-selected-count" style="margin:0">محدّد: 6</span>
+          </div>
           <div id="train-timeline" class="stage-strip" style="margin-bottom:0.85rem"></div>
           <div id="current-run-tf-cards" class="tf-status-grid"></div>
         </article>
@@ -213,8 +220,8 @@
 
         <article class="card" id="tie-panel" style="margin-top:1rem">
           <div class="card-head-row">
-            <h2>محرك التدريب الذكي · e4-v16 Research Factory</h2>
-            <span class="chip" id="tie-pipeline-chip">Research Factory —</span>
+            <h2>محرك التدريب الذكي · e4-v17.1 Weakness Hardening</h2>
+            <span class="chip" id="tie-pipeline-chip">Weakness Hardening —</span>
           </div>
           <p class="card-note">Barrier sweep · Label cleaning · Fold stability · Crisis holdout · Shadow challenger · Research board · H4 quarantine.</p>
           <div class="kpi-row" id="tie-kpis"></div>
@@ -591,15 +598,43 @@
           </article>
         </div>
 
-        <article class="card" style="margin-top:1rem">
+        <article class="card" style="margin-top:1rem" id="relations-card">
           <div class="card-head-row">
             <h2>شبكة علاقات الأنماط</h2>
-            <button class="btn btn-tiny" type="button" data-view-pattern-section="relations">استعراض JSON</button>
+            <div class="btn-row">
+              <button class="btn btn-tiny" type="button" id="btn-relations-rebuild">إعادة بناء الشبكة</button>
+              <button class="btn btn-tiny" type="button" data-view-pattern-section="relations">استعراض JSON</button>
+            </div>
           </div>
           <p class="card-note" id="relations-summary">—</p>
-          <div class="table-scroll">
+          <div class="chip-row" id="relations-stats" style="margin:0.55rem 0 0.75rem"></div>
+          <div class="relations-filters chip-row" id="relations-filters" style="margin-bottom:0.75rem">
+            <button type="button" class="chip rel-filter active" data-rel-filter="all">الكل</button>
+            <button type="button" class="chip rel-filter" data-rel-filter="co_occurrence">تزامن</button>
+            <button type="button" class="chip rel-filter" data-rel-filter="precedes">يسبق</button>
+            <button type="button" class="chip rel-filter" data-rel-filter="cancels">يتعارض</button>
+          </div>
+          <div class="relations-layout">
+            <div class="relations-graph-wrap">
+              <canvas id="relations-graph" width="720" height="420" aria-label="رسم شبكة العلاقات"></canvas>
+              <p class="card-note" id="relations-graph-hint">اسحب الدوائر للتحريك · الحجم = تكرار الظهور</p>
+            </div>
+            <div class="relations-side">
+              <h3 class="relations-side-title">أقوى التسلسلات</h3>
+              <div id="relations-sequences" class="relations-seq-list"></div>
+            </div>
+          </div>
+          <div class="table-scroll" style="margin-top:0.85rem">
             <table class="data">
-              <thead><tr><th>المصدر</th><th>العلاقة</th><th>الهدف</th><th>العدد</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>المصدر</th>
+                  <th>العلاقة</th>
+                  <th>الهدف</th>
+                  <th>العدد</th>
+                  <th>الوزن</th>
+                </tr>
+              </thead>
               <tbody id="relations-body"></tbody>
             </table>
           </div>
@@ -709,7 +744,7 @@
               تحديد الكل
             </label>
           </div>
-          <p class="card-note">اختر إطاراً أو أكثر — كل إطار يستخدم نموذجه المدرّب (FinalModel / Champion). عند اختيار عدة أطر تُدمج الأصوات في قرار واحد قبل الشراء/البيع</p>
+          <p class="card-note">اختر إطاراً أو أكثر — كل إطار يستخدم نموذجه المدرّب (FinalModel / Champion) ويحلّل بياناته ويتخذ قراره وينفّذ بشكل منفصل عن باقي الأطر</p>
           <div class="auto-tf-grid" id="auto-tf-checks">
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M1" /> M1</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M5" /> M5</label>
@@ -737,6 +772,35 @@
           <table class="kv"><tbody id="decision-table"></tbody></table>
         </article>
         <article class="card" style="margin-top:1rem">
+          <div class="card-head-row">
+            <h2>الصفقات المفتوحة</h2>
+            <div class="btn-row positions-actions">
+              <button class="btn" id="btn-close-winners" type="button" title="إغلاق الصفقات الرابحة فقط">إغلاق الرابحة</button>
+              <button class="btn" id="btn-close-losers" type="button" title="إغلاق الصفقات الخاسرة فقط">إغلاق الخاسرة</button>
+              <button class="btn danger" id="btn-close-all" type="button" title="إغلاق جميع الصفقات المفتوحة">إغلاق الكل</button>
+            </div>
+          </div>
+          <p class="card-note" id="positions-summary">لا صفقات مفتوحة</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>التذكرة</th>
+                  <th>الاتجاه</th>
+                  <th>الحجم</th>
+                  <th>الدخول</th>
+                  <th>الحالي</th>
+                  <th>SL</th>
+                  <th>TP</th>
+                  <th>الربح/الخسارة</th>
+                  <th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card" style="margin-top:1rem">
           <h2>سجل الصفقات</h2>
           <div class="table-scroll">
             <table class="data">
@@ -752,12 +816,48 @@
         <div class="page-head">
           <div>
             <h1>الإعدادات</h1>
-            <p class="page-desc">ضبط شروط الدخول الحي · الموديل دائماً هو الأساس</p>
+            <p class="page-desc">MT5 · التداول الحي · التدريب · التعلم · التحقق · الاختبار</p>
           </div>
           <div class="btn-row">
+            <button class="btn" id="btn-settings-reload" type="button">إعادة تحميل</button>
             <button class="btn primary" id="btn-settings-save" type="button">حفظ الإعدادات</button>
           </div>
         </div>
+
+        <article class="card">
+          <div class="card-head-row">
+            <h2>حساب MetaTrader 5</h2>
+            <span class="chip" id="mt5-conn-chip">—</span>
+          </div>
+          <p class="card-note">
+            رقم الحساب وكلمة المرور والسيرفر تُحفظ في <code>config/secrets.env</code> (غير مضمّنة في Git).
+          </p>
+          <table class="kv" style="margin-top:0.75rem">
+            <tbody>
+              <tr>
+                <th>رقم الحساب / اسم المستخدم (Login)</th>
+                <td><input class="btn settings-input" id="setting-mt5-login" type="text" inputmode="numeric" autocomplete="username" placeholder="مثال: 12345678" style="width:min(100%,18rem);text-align:left;direction:ltr" /></td>
+              </tr>
+              <tr>
+                <th>كلمة المرور</th>
+                <td><input class="btn settings-input" id="setting-mt5-password" type="password" autocomplete="current-password" placeholder="اتركها كما هي إن لم تتغيّر" style="width:min(100%,18rem);text-align:left;direction:ltr" /></td>
+              </tr>
+              <tr>
+                <th>السيرفر</th>
+                <td><input class="btn settings-input" id="setting-mt5-server" type="text" autocomplete="off" placeholder="مثال: Broker-Demo" style="width:min(100%,18rem);text-align:left;direction:ltr" /></td>
+              </tr>
+              <tr>
+                <th>مسار التيرمنال (اختياري)</th>
+                <td><input class="btn settings-input" id="setting-mt5-path" type="text" autocomplete="off" placeholder="C:\Program Files\...\terminal64.exe" style="width:min(100%,28rem);text-align:left;direction:ltr" /></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="btn-row" style="margin-top:0.85rem">
+            <button class="btn" id="btn-mt5-test" type="button">التحقق من الاتصال</button>
+            <button class="btn primary" id="btn-mt5-save" type="button">حفظ بيانات MT5</button>
+          </div>
+          <div class="banner" id="mt5-settings-banner" style="margin-top:0.75rem">—</div>
+        </article>
 
         <article class="card">
           <div class="card-head-row">
@@ -789,6 +889,14 @@
             </tbody>
           </table>
         </article>
+
+        <div class="settings-train-head">
+          <h2 class="subhead" style="margin:0">إعدادات التدريب والتعلم والتحقق والاختبار</h2>
+          <p class="card-note" id="training-settings-count" style="margin:0.35rem 0 0">جاري التحميل…</p>
+        </div>
+        <div id="training-settings-root" class="settings-train-root">
+          <article class="card"><p class="card-note">انتظر تحميل إعدادات engine4_training…</p></article>
+        </div>
       </section>
 
       <!-- ENGINES -->
@@ -854,6 +962,21 @@
       <pre id="json-modal-body" class="json-view"></pre>
     </div>
   </div>
-  <script src="/static/app.js?v=20260731c"></script>
+
+  <div id="help-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-help-modal></div>
+    <div class="modal-panel help-modal-panel" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="help-modal-title">شرح الإعداد</h2>
+          <p class="page-desc" id="help-modal-key">—</p>
+        </div>
+        <button class="btn" type="button" data-close-help-modal>إغلاق</button>
+      </div>
+      <div id="help-modal-body" class="help-modal-body"></div>
+    </div>
+  </div>
+  <script src="/static/training_help.js?v=20260803c"></script>
+  <script src="/static/app.js?v=20260803c"></script>
 </body>
 </html>

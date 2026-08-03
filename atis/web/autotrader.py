@@ -89,6 +89,18 @@ class AutoTrader:
                 raise RuntimeError("Kill switch is active — deactivate before auto-trading")
 
             tfs = _normalize_timeframes(timeframe=timeframe, timeframes=timeframes)
+            independent = bool(cfg.get("multi_tf_independent", True)) and not bool(
+                cfg.get("multi_tf_fusion", False)
+            )
+            fusion_label = (
+                "independent"
+                if (len(tfs) > 1 and independent)
+                else (
+                    str(cfg.get("multi_tf_fusion_mode", "weighted_consensus"))
+                    if len(tfs) > 1
+                    else "single"
+                )
+            )
             self.state = AutoTraderState(
                 running=True,
                 mode=mode if mode in ("paper", "demo") else "paper",
@@ -97,7 +109,7 @@ class AutoTrader:
                 timeframes=tfs,
                 interval_seconds=max(15, int(interval_seconds)),
                 started_at=_utc(),
-                fusion_mode=str(cfg.get("multi_tf_fusion_mode", "weighted_consensus")),
+                fusion_mode=fusion_label,
                 stop_requested=False,
             )
             self._thread = threading.Thread(target=self._loop, daemon=True)
@@ -107,7 +119,7 @@ class AutoTrader:
                 mode=self.state.mode,
                 interval=self.state.interval_seconds,
                 timeframes=tfs,
-                fusion=self.state.fusion_mode,
+                multi_tf_mode=fusion_label,
             )
             return self.state.to_dict()
 
@@ -138,7 +150,8 @@ class AutoTrader:
                     logger.error("autotrader_stopped_kill_switch")
                     break
 
-                # Multi-TF: one fused decision from all trained models before any order.
+                # Multi-TF: each selected TF analyzes and trades independently
+                # (unless multi_tf_fusion is enabled in config).
                 # Single TF: that TF's trained model only.
                 if len(timeframes) > 1:
                     report = run_live_multi_tf(
@@ -163,7 +176,10 @@ class AutoTrader:
                     self.state.last_report = asdict(report)
                     self.state.last_reports_by_tf = {
                         "timeframes": timeframes,
-                        "fusion": len(timeframes) > 1,
+                        "mode": self.state.fusion_mode,
+                        "independent": self.state.fusion_mode == "independent",
+                        "fusion": self.state.fusion_mode not in ("independent", "single")
+                        and len(timeframes) > 1,
                         "signals": int(report.signals),
                         "orders": int(report.orders_sent),
                     }

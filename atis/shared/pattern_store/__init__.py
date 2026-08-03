@@ -187,6 +187,27 @@ def _rank_key(row: dict[str, Any], field: str) -> float:
     except (TypeError, ValueError):
         return -1e18
 
+
+def _engine4_eligible(row: dict[str, Any], timeframe: str) -> bool:
+    """Engine4 recommend gate: approve/soft + TF sample floors; reject ultra-rare."""
+    from atis.shared.pattern_discovery.validation import gates_for_timeframe
+
+    g = gates_for_timeframe(timeframe)
+    min_occ = int(g.get("min_occurrences_rank", g.get("min_evaluated", 25)))
+    min_sr = float(g.get("min_success_rate", 0.54))
+    min_eval = int(g.get("min_evaluated", 25))
+    if not (row.get("approved") or row.get("soft_promoted")):
+        return False
+    if row.get("htf_confirm") is False:
+        return False
+    if (row.get("occurrences") or 0) < min_occ:
+        return False
+    if (row.get("evaluated") or 0) < min_eval:
+        return False
+    if (row.get("success_rate") or 0) < min_sr:
+        return False
+    return True
+
 def save_timeframe_pattern_bundle(
     *,
     symbol: str,
@@ -266,7 +287,9 @@ def save_timeframe_pattern_bundle(
                 "quality_score": item.get("quality_score"),
                 "strength": item.get("strength"),
                 "approved": item.get("approved"),
+                "soft_promoted": item.get("soft_promoted"),
                 "validation": item.get("validation"),
+                "htf_confirm": item.get("htf_confirm"),
                 "bias": item.get("bias") or "neutral",
                 "category": "discovered",
                 "symbol": symbol,
@@ -285,7 +308,8 @@ def save_timeframe_pattern_bundle(
                 **{k: row.get(k) for k in (
                     "description", "mathematical_rules", "logical_rules", "appearance_conditions",
                     "occurrences", "success_rate", "std_dev", "risk_ratio", "confidence",
-                    "quality_score", "strength", "approved", "validation", "bias",
+                    "quality_score", "strength", "approved", "soft_promoted", "htf_confirm",
+                    "validation", "bias",
                     "best_timeframe", "best_market_regime",
                 )},
                 "avg_move_after": row.get("avg_forward_return"),
@@ -353,12 +377,7 @@ def save_timeframe_pattern_bundle(
         "engine4_recommended": [
             r
             for r in sorted(enriched, key=lambda x: _rank_key(x, "quality_score"), reverse=True)
-            if (
-                (r.get("approved") or r.get("soft_promoted"))
-                and (r.get("success_rate") or 0) >= 0.54
-                and (r.get("occurrences") or 0) >= 20
-                and (r.get("evaluated") or 0) >= 20
-            )
+            if _engine4_eligible(r, timeframe)
         ][:40],
     }
     validation_items = []
@@ -479,18 +498,21 @@ def save_timeframe_pattern_bundle(
             **{k: _json_safe(v) for k, v in rankings.items()},
         },
     )
-    write_json(
-        paths[SECTION_RELATIONS],
-        {
-            "section": SECTION_RELATIONS,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "updated_at": _utc(),
-            "title": "شبكة علاقات الأنماط",
-            "bars_scanned": bars_scanned,
-            **_json_safe(relations),
-        },
-    )
+    # Never clobber a populated relations graph with an empty resume shell
+    existing_rel = read_json(paths[SECTION_RELATIONS]) or {}
+    if relations_has_content(relations) or not relations_has_content(existing_rel):
+        write_json(
+            paths[SECTION_RELATIONS],
+            {
+                "section": SECTION_RELATIONS,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "updated_at": _utc(),
+                "title": "شبكة علاقات الأنماط",
+                "bars_scanned": bars_scanned,
+                **_json_safe(relations),
+            },
+        )
     write_json(
         paths[SECTION_VALIDATION],
         _section_payload(
@@ -507,6 +529,78 @@ def save_timeframe_pattern_bundle(
         ),
     )
     return {section: str(path) for section, path in paths.items()}
+
+
+def relations_has_content(payload: dict[str, Any] | None) -> bool:
+    return bool(payload and payload.get("edges"))
+
+
+def save_relations_section(
+    *,
+    symbol: str,
+    timeframe: str,
+    relations: dict[str, Any],
+    bars_scanned: int | None = None,
+) -> Path:
+    """Persist / overwrite the relations.json section for one TF."""
+    path = section_path(symbol, timeframe, SECTION_RELATIONS)
+    payload = {
+        "section": SECTION_RELATIONS,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "updated_at": _utc(),
+        "title": "شبكة علاقات الأنماط",
+        "bars_scanned": bars_scanned if bars_scanned is not None else relations.get("bars"),
+        **_json_safe(relations),
+    }
+    return write_json(path, payload)
+
+
+def rebuild_relations_from_features(
+    symbol: str,
+    timeframe: str,
+    *,
+    lookback: int | None = None,
+    df=None,
+) -> dict[str, Any]:
+    """Build relations from features and persist relations.json."""
+    from atis.shared.pattern_discovery.relations import (
+        build_pattern_relations,
+        pattern_relation_columns,
+    )
+
+    if df is None:
+        import pandas as pd
+
+        path = get_path("data_features") / symbol / timeframe / "features.parquet"
+        json_path = get_path("data_features") / symbol / timeframe / "features.json"
+        if path.exists():
+            df = pd.read_parquet(path)
+        elif json_path.exists():
+            from atis.shared.data_json import load_timeframe_json
+
+            df = load_timeframe_json(json_path)
+        else:
+            return {
+                "nodes": [],
+                "edges": [],
+                "sequences": [],
+                "summary": "لا ميزات متاحة لبناء الشبكة",
+                "empty": True,
+            }
+        if lookback and lookback > 0 and len(df) > lookback:
+            df = df.tail(lookback).copy()
+    labels = pattern_labels()
+    rel_cols = pattern_relation_columns(df)
+    graph = build_pattern_relations(df, rel_cols, labels=labels)
+    save_relations_section(
+        symbol=symbol,
+        timeframe=timeframe,
+        relations=graph,
+        bars_scanned=int(len(df)),
+    )
+    return graph
+
 
 def write_discovery_report(
     *,
@@ -533,10 +627,9 @@ def write_discovery_report(
     engine4 = [
         r
         for r in sorted(enriched, key=lambda x: _rank_key(x, "quality_score"), reverse=True)
-        if (r.get("approved") or r.get("soft_promoted"))
-        and (r.get("success_rate") or 0) >= 0.54
-        and (r.get("occurrences") or 0) >= 20
+        if _engine4_eligible(r, timeframe)
     ][:15]
+    htf_blocked = sum(1 for r in enriched if r.get("htf_confirm") is False)
     lines = [
         f"# تقرير استكشاف الأنماط — {symbol} / {timeframe}",
         "",
@@ -545,6 +638,13 @@ def write_discovery_report(
         f"- أنماط معروفة بإصابات: **{len(known)}**",
         f"- أنماط جديدة NewN: **{len(new_patterns)}** (معتمد: {len(approved_new)} · soft: {len(soft_new)} · مرفوض: {len(rejected_new)})",
         f"- علاقات: **{len((relations or {}).get('edges') or [])}** حافة",
+        "",
+        "## قواعد الترقية (Engine4)",
+        "",
+        "- بوابات التحقق حسب الإطار الزمني (`TF_GATE_OVERRIDES`): عينات أعلى لـ M1، ونجاح/PF أشد لـ H1/H4.",
+        "- الأنماط النادرة جداً تُرفض تلقائياً (`rare_pattern` / `min_occurrences_rank`) ولا تدخل `engine4_recommended`.",
+        "- قبل soft-promote / engine4_recommended: يُشترط اتساق اتجاه مع إطار أعلى (HTF) عبر `pat_bias` أو `chart_pattern_score` عند توفره؛ عدم التوافق يمنع الترقية.",
+        f"- أنماط حُجبت بسبب عدم توافق HTF في هذا التشغيل: **{htf_blocked}**",
         "",
         "## أفضل الأنماط (quality_score)",
         "",

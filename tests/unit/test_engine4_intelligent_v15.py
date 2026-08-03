@@ -10,8 +10,17 @@ from sklearn.ensemble import RandomForestClassifier
 def test_pipeline_version_v15():
     from atis.engines.engine4_training import PIPELINE_VERSION
 
-    assert "v15" in PIPELINE_VERSION or "v16" in PIPELINE_VERSION
-    assert "intelligent-training" in PIPELINE_VERSION or "research-factory" in PIPELINE_VERSION
+    assert (
+        "v15" in PIPELINE_VERSION
+        or "v16" in PIPELINE_VERSION
+        or "v17" in PIPELINE_VERSION
+    )
+    assert (
+        "intelligent-training" in PIPELINE_VERSION
+        or "research-factory" in PIPELINE_VERSION
+        or "priority-hardening" in PIPELINE_VERSION
+        or "weakness-hardening" in PIPELINE_VERSION
+    )
 
 
 def test_label_quality_report():

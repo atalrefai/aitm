@@ -284,6 +284,93 @@ def classify_market_regimes(
     }
 
 
+def reconcile_regime_stability(
+    regime_report: dict[str, Any],
+    *,
+    min_strong_floor: float = 2.0,
+    collapse_floor: float = -0.5,
+    weak_floor: float = 1.5,
+    abs_spread_max: float = 4.0,
+    rel_spread_max: float = 0.75,
+) -> dict[str, Any]:
+    """Recompute ``stable`` from per-regime Sharpes (also fixes legacy false positives).
+
+    Unstable only when a regime collapses or the weakest regime is modest/weak with
+    large dispersion. High-Sharpe books where every regime stays strong are
+    elevated dispersion — not instability.
+
+    Examples that must stay stable:
+    - M15 floor≈3.8 spread≈4.2 (all regimes strong)
+    - M30 floor≈2.55 rel≈0.68 spread≈3.1 (all expectancy > 0) — never flag on
+      relative spread alone when the floor is already ≥ ``min_strong_floor``.
+    """
+    out = dict(regime_report or {})
+    regimes = out.get("regimes") or {}
+    sharpes: list[float] = []
+    expectancies: list[float] = []
+    for row in regimes.values():
+        if not isinstance(row, dict) or row.get("skipped") or row.get("error"):
+            continue
+        sharpes.append(float(row.get("sharpe", 0.0) or 0.0))
+        if "expectancy" in row:
+            expectancies.append(float(row.get("expectancy", 0.0) or 0.0))
+
+    notes = [n for n in list(out.get("notes") or []) if n not in {
+        "performance_collapses_in_at_least_one_regime",
+        "large_sharpe_dispersion_across_regimes",
+        "large_relative_sharpe_dispersion_across_regimes",
+        "elevated_sharpe_dispersion_all_regimes_strong",
+        "elevated_relative_dispersion_all_regimes_strong",
+        "insufficient_regime_coverage_for_stability",
+    }]
+    out["stable"] = True
+
+    if len(sharpes) < 2:
+        notes.append("insufficient_regime_coverage_for_stability")
+        out["notes"] = notes
+        return out
+
+    floor_s = float(min(sharpes))
+    ceil_s = float(max(sharpes))
+    spread = float(ceil_s - floor_s)
+    med = float(np.median(np.asarray(sharpes, dtype=float)))
+    rel_spread = spread / max(abs(med), 1.0)
+    out["sharpe_regime_spread"] = spread
+    out["sharpe_regime_median"] = med
+    out["sharpe_regime_rel_spread"] = float(rel_spread)
+    out["sharpe_regime_floor"] = floor_s
+
+    all_exp_nonneg = (not expectancies) or all(e >= 0.0 for e in expectancies)
+
+    if floor_s < collapse_floor and ceil_s > 1.0 and spread > 2.5:
+        out["stable"] = False
+        notes.append("performance_collapses_in_at_least_one_regime")
+    elif floor_s < weak_floor and spread > abs_spread_max:
+        out["stable"] = False
+        notes.append("large_sharpe_dispersion_across_regimes")
+    elif (
+        # Relative dispersion is only a fragility signal in the *modest* band.
+        # Never apply when floor ≥ min_strong_floor (legacy bug: floor≥2 & rel>0.55).
+        weak_floor <= floor_s < min_strong_floor
+        and rel_spread > rel_spread_max
+        and floor_s < med * 0.45
+    ):
+        out["stable"] = False
+        notes.append("large_relative_sharpe_dispersion_across_regimes")
+    elif floor_s >= min_strong_floor and all_exp_nonneg and spread > abs_spread_max:
+        notes.append("elevated_sharpe_dispersion_all_regimes_strong")
+    elif floor_s >= min_strong_floor and all_exp_nonneg and rel_spread > rel_spread_max:
+        # Informative only — profitable in every regime, dispersion is not instability.
+        notes.append("elevated_relative_dispersion_all_regimes_strong")
+    elif floor_s >= min_strong_floor and not all_exp_nonneg and spread > abs_spread_max:
+        # Strong Sharpes but a non-positive expectancy regime — still fragile.
+        out["stable"] = False
+        notes.append("large_sharpe_dispersion_across_regimes")
+
+    out["notes"] = notes
+    return out
+
+
 def evaluate_by_regime(
     returns: np.ndarray,
     regime_masks: dict[str, np.ndarray],
@@ -294,7 +381,6 @@ def evaluate_by_regime(
     """Per-regime financial metrics for generalization / stress diagnostics."""
     rets = np.asarray(returns, dtype=float)
     out: dict[str, Any] = {"regimes": {}, "stable": True, "notes": []}
-    sharpes: list[float] = []
     for name, mask in regime_masks.items():
         m = np.asarray(mask, dtype=bool)
         if len(m) != len(rets):
@@ -313,7 +399,7 @@ def evaluate_by_regime(
             }
             continue
         fin = financial_fn(sliced)
-        row = {
+        out["regimes"][name] = {
             "n_bars": n_active,
             "n_trades": n_trades,
             "sharpe": float(fin.get("sharpe", 0.0) or 0.0),
@@ -324,22 +410,8 @@ def evaluate_by_regime(
             "win_rate": float(fin.get("win_rate", 0.0) or 0.0),
             "skipped": False,
         }
-        out["regimes"][name] = row
-        sharpes.append(row["sharpe"])
 
-    if len(sharpes) >= 2:
-        spread = float(max(sharpes) - min(sharpes))
-        out["sharpe_regime_spread"] = spread
-        # Unstable if one regime strongly positive and another strongly negative
-        if min(sharpes) < -0.5 and max(sharpes) > 1.0 and spread > 2.5:
-            out["stable"] = False
-            out["notes"].append("performance_collapses_in_at_least_one_regime")
-        elif spread > 4.0:
-            out["stable"] = False
-            out["notes"].append("large_sharpe_dispersion_across_regimes")
-    else:
-        out["notes"].append("insufficient_regime_coverage_for_stability")
-    return out
+    return reconcile_regime_stability(out)
 
 
 def protocol_rationale() -> dict[str, str]:

@@ -53,30 +53,42 @@ engine3_features:
 engine4_training:
   model_family: baseline
   task: classification
-  horizon_bars: 12
+  horizon_bars: 10
   horizon_by_timeframe:
     M1: 30
     M5: 12
     M15: 12
     M30: 8
     H1: 6
-    H4: 4
+    H4: 6
     D1: 3
     W1: 2
     MN1: 1
   labeling: triple_barrier
-  barrier_atr_multiplier: 1.5
+  barrier_atr_multiplier: 1.65
   barrier_atr_multiplier_by_tf:
-    M1: 2.2
-    M5: 2.0
-    M15: 1.6
-    M30: 1.5
-    H1: 1.5
-    H4: 1.85
+    M1: 2.4
+    M5: 2.15
+    M15: 1.75
+    M30: 1.65
+    H1: 1.65
+    H4: 1.75
+  barrier_sweep_atr_grid_by_tf:
+    H4:
+    - 1.45
+    - 1.65
+    - 1.85
+    - 2.1
+  barrier_sweep_horizon_grid_by_tf:
+    H4:
+    - 4
+    - 6
+    - 8
+    - 10
   train_on_directional_only: true
   drop_constant_features: true
   drop_registry_context: true
-  walk_forward_splits: 5
+  walk_forward_splits: 50
   train_ratio: 0.7
   val_ratio: 0.15
   test_ratio: 0.15
@@ -85,14 +97,22 @@ engine4_training:
     M1: 40
     M5: 44
     M15: 52
-    M30: 52
+    M30: 40
     H1: 56
-    H4: 36
+    H4: 28
   stable_feature_selection: true
-  stable_feature_min_frac: 0.6
+  stable_feature_min_frac: 0.65
+  stable_feature_min_frac_by_tf:
+    H4: 0.45
   stable_feature_windows: 3
   engineer_learning_features: true
   cross_tf_features: true
+  pattern_relation_features: true
+  pattern_relation_top_co: 12
+  pattern_relation_top_prec: 16
+  pattern_relation_top_cancel: 8
+  pattern_relation_top_seq: 8
+  pattern_relation_max_pair_features: 40
   overtrading_rate_tol_frac: 0.05
   cross_tf_sources:
   - W1
@@ -102,7 +122,7 @@ engine4_training:
   - M30
   - M15
   - M5
-  time_decay_half_life: 0.35
+  time_decay_half_life: 0.45
   trend_align: true
   write_final_model: true
   allow_paper_final: false
@@ -119,7 +139,7 @@ engine4_training:
   lgb_subsample: 0.75
   lgb_colsample: 0.55
   lgb_reg_alpha: 0.5
-  lgb_reg_lambda: 3.0
+  lgb_reg_lambda: 3
   lgb_early_stopping: true
   lgb_early_stopping_rounds: 50
   lgb_by_tf:
@@ -129,7 +149,7 @@ engine4_training:
       lgb_num_leaves: 12
       lgb_min_child_samples: 220
       lgb_reg_lambda: 5.5
-      lgb_reg_alpha: 1.0
+      lgb_reg_alpha: 1
       lgb_colsample: 0.42
       lgb_subsample: 0.7
       lgb_learning_rate: 0.022
@@ -159,51 +179,61 @@ engine4_training:
       lgb_num_leaves: 12
       lgb_min_child_samples: 180
       lgb_reg_lambda: 5.5
-      lgb_reg_alpha: 1.0
+      lgb_reg_alpha: 1
       lgb_colsample: 0.45
       lgb_subsample: 0.7
       lgb_learning_rate: 0.022
       lgb_early_stopping_rounds: 40
     M30:
-      lgb_estimators: 230
-      lgb_min_child_samples: 110
-      lgb_reg_lambda: 2.8
+      lgb_estimators: 180
+      lgb_max_depth: 3
+      lgb_num_leaves: 12
+      lgb_min_child_samples: 160
+      lgb_reg_lambda: 4.5
+      lgb_reg_alpha: 0.9
+      lgb_colsample: 0.48
+      lgb_subsample: 0.7
+      lgb_learning_rate: 0.022
     M15:
       lgb_estimators: 200
       lgb_min_child_samples: 160
-      lgb_reg_lambda: 4.0
+      lgb_reg_lambda: 4
       lgb_reg_alpha: 0.7
       lgb_colsample: 0.5
   fail_on_overfit: true
   fail_on_unstable_generalization: true
   max_train_val_acc_gap: 0.16
-  max_train_val_sharpe_gap: 2.0
+  max_train_val_sharpe_gap: 2
   val_test_sharpe_gap_hard_max: 3.5
   max_train_val_acc_gap_by_tf:
     H4: 0.14
     M1: 0.16
     M5: 0.16
-  decision_threshold: 0.54
-  min_trade_confidence: 0.54
-  directional_edge: 0.16
-  confidence_quantile: 0.85
+    M30: 0.14
+  max_train_val_sharpe_gap_by_tf:
+    M30: 1.6
+    M15: 1.8
+  decision_threshold: 0.58
+  min_trade_confidence: 0.58
+  directional_edge: 0.18
+  confidence_quantile: 0.9
   confidence_quantile_by_tf:
-    M1: 0.84
-    M5: 0.8
-    M15: 0.78
-    M30: 0.78
-    H1: 0.84
-    H4: 0.8
-  min_confidence_floor: 0.52
-  max_confidence_floor: 0.7
-  cost_edge_multiple: 1.35
+    M1: 0.91
+    M5: 0.93
+    M15: 0.93
+    M30: 0.9
+    H1: 0.93
+    H4: 0.88
+  min_confidence_floor: 0.58
+  max_confidence_floor: 0.88
+  cost_edge_multiple: 1.4
   cost_edge_multiple_by_tf:
-    M1: 1.55
-    M5: 1.4
-    M15: 1.15
-    M30: 1.2
-    H1: 1.3
-    H4: 1.35
+    M1: 1.65
+    M5: 1.5
+    M15: 1.25
+    M30: 1.3
+    H1: 1.35
+    H4: 1.4
   regime_filter: true
   regime_atr_low_q: 0.22
   regime_atr_high_q: 0.88
@@ -217,17 +247,67 @@ engine4_training:
     M15: true
     M30: true
     H1: true
-    H4: false
-  max_fold_trade_rate: 0.22
+    H4: true
+  quality_first_trade_policy: true
+  quality_compound_enabled: true
+  regime_balanced_holdouts: false
+  fail_on_regime_balanced_holdouts: false
+  regime_balanced_min_regimes: 3
+  regime_balanced_min_win_rate: 0.48
+  regime_balanced_min_expectancy: -0.000001
+  min_consistency_score: 55
+  min_consistency_for_live: 55
+  consistency_max_cv_win_rate: 0.25
+  consistency_max_cv_f1: 0.3
+  consistency_max_cv_expectancy: 0.85
+  max_fold_trade_rate: 0.08
+  max_fold_trade_rate_by_tf:
+    M1: 0.06
+    M5: 0.05
+    M15: 0.045
+    M30: 0.07
+    H1: 0.035
+    H4: 0.08
+  quality_first_cap_headroom_frac: 0.82
+  fail_on_inflated_sharpe: true
+  max_sharpe_uncapped: 12
+  max_uncapped_to_capped_ratio: 2.2
+  max_path_vs_trade_gap: 0.1
+  min_trade_sharpe_raw: 0.05
+  enforce_min_trade_sharpe_raw: true
+  uncapped_rescue_min_trade_sharpe: 0.35
+  max_uncapped_ratio_with_trade_rescue: 4
+  rank_by_trade_sharpe: true
+  fail_on_early_folds_weak: true
+  early_fold_frac: 0.4
+  early_fold_min_acc: 0.58
+  early_fold_min_auc: 0.6
+  early_fold_min_mean_test_sharpe: 0
+  early_fold_max_neg_frac: 0.34
+  early_fold_min_count: 2
+  self_diagnostic_enabled: true
+  honest_val_sharpe_from_folds: true
+  honest_val_cap_by_fold_test: true
+  honest_val_fold_test_slack: 2.5
+  penalize_pegged_trade_rate_in_hpo: true
+  nested_hp_train_val_gap_penalty: true
+  prefer_simpler_within_epsilon: true
+  live_ready_require_honesty: true
+  min_metric_honesty_for_live: 65
+  min_generalization_for_live: 65
+  fail_on_shap_missing: false
+  force_shadow_on_passed_keep: true
+  shap_max_rows: 400
   nested_deploy_tune: true
   deploy_liquidity_rescue: true
   require_val_test_consistency: true
-  val_test_sharpe_gap_max: 2.0
+  val_test_sharpe_gap_max: 2
+  val_gap_prefer_deploy_holdout: true
   min_median_fold_val_sharpe: -0.5
   apply_oos_sparsify: false
   deploy_from_last_window: true
   gate_on_deploy_holdout: true
-  min_deploy_holdout_sharpe: 0.0
+  min_deploy_holdout_sharpe: 0
   min_deploy_holdout_trades: 12
   min_deploy_holdout_trades_floor: 8
   min_reliable_deploy_trades: 10
@@ -245,10 +325,10 @@ engine4_training:
     H4: 600
   min_val_trades_per_fold: 12
   min_val_trades_by_tf:
-    M1: 20
-    M5: 20
-    M15: 18
-    M30: 15
+    M1: 18
+    M5: 18
+    M15: 16
+    M30: 14
     H1: 12
     H4: 8
   min_liquid_val_fold_frac: 0.4
@@ -256,7 +336,7 @@ engine4_training:
   nested_hp_search: true
   nested_hp_trials: 8
   nested_hp_compare_baselines: true
-  nested_hp_allow_family_switch: false
+  nested_hp_allow_family_switch: true
   dynamic_execution_costs: true
   vol_slippage_k: 1.25
   validation_mode: expanding
@@ -267,14 +347,19 @@ engine4_training:
   use_ensemble: false
   fail_on_regime_unstable: true
   fail_on_weak_expectancy: true
-  min_expectancy: 0.0
-  fail_on_high_pbo: false
+  min_expectancy: 0
+  fail_on_high_pbo: true
   max_pbo: 0.55
+  pbo_require_corroboration: true
+  pbo_min_paths_for_hard_fail: 6
+  pbo_full_trust_paths: 10
+  pbo_oos_collapse_frac: 0.65
+  pbo_corroborate_val_test_gap: 2
+  pbo_material_retention_min: 0.75
   regime_trend_window: 48
   regime_eval_vol_low_q: 0.3
   regime_eval_vol_high_q: 0.7
   regime_min_bars: 40
-  # --- Enterprise Learning Platform (e4-v16 Research Factory) ---
   data_intel_hard: false
   data_intel_min_score: 55
   feature_intelligence_enabled: true
@@ -286,39 +371,38 @@ engine4_training:
   label_max_noise_score: 0.65
   feature_explainability_enabled: true
   shap_enabled: true
-  shap_max_rows: 600
   permutation_importance_enabled: true
   permutation_n_repeats: 4
   fail_on_unstable_features: false
   nested_hp_per_fold: true
   nested_hp_outer_folds: 3
-  nested_hp_objective: financial_proxy
-  nested_hp_allow_family_switch: true
-  prefer_ensemble_on_conflict: true
-  use_ensemble_on_conflict: true
+  nested_hp_objective: expectancy_cost
+  nested_hp_unit_cost: 0.00025
+  prefer_ensemble_on_conflict: false
+  use_ensemble_on_conflict: false
   model_zoo_financial_proxy: true
   challenger_min_score_delta: 0.05
   challenger_min_sharpe_delta: 0.05
-  # --- Research Factory / v16 Intelligent Upgrades ---
   barrier_sweep_enabled: true
   barrier_sweep_min_gain: 0.02
   label_cleaning_enabled: true
-  label_clean_noise_trigger: 0.35
-  label_clean_shrink: 0.65
+  label_clean_noise_trigger: 0.32
+  label_clean_shrink: 0.7
   auto_drop_unstable_features: true
   fail_on_fold_unstable: true
-  fold_stability_max_iqr: 4.0
+  fold_stability_max_iqr: 4
   fold_stability_min_pos_frac: 0.6
   fail_on_expectancy_below_cost: true
-  expectancy_cost_multiple: 1.0
+  expectancy_cost_multiple: 1
   fail_on_crisis_holdout_weak: true
   min_crisis_holdout_sharpe: -0.5
   fail_on_recent_holdout_weak: false
-  min_recent_holdout_sharpe: 0.0
+  min_recent_holdout_sharpe: 0
   recent_holdout_frac: 0.12
   crisis_holdout_frac: 0.15
-  fail_on_trade_rate_saturated: false
-  stress_spread_shock: 2.0
+  fail_on_trade_rate_saturated: true
+  min_policy_freeze_trade_rate: 0.02
+  stress_spread_shock: 2
   stress_noise_sigma: 0.0008
   stress_drop_frac: 0.12
   stress_latency_extra: 2
@@ -328,22 +412,22 @@ engine4_training:
   - H4
   retrain_drift_threshold: 0.25
   research_stop_min_runs: 3
+  apply_research_next_hypothesis: true
   cpcv_n_groups: 6
   cpcv_n_test_groups: 2
   cpcv_max_paths: 12
-  # Set validation_mode: cpcv_lite for promotion-grade diversity (slower).
-  # Or enable use_promotion_validation_mode to auto-switch to promotion_validation_mode.
   promotion_validation_mode: cpcv_lite
-  use_promotion_validation_mode: false
+  use_promotion_validation_mode: true
   confidence_sizing_enabled: true
-  confidence_sizing_base: 1.0
+  confidence_sizing_base: 1
   confidence_sizing_max: 1.5
   confidence_sizing_min: 0.25
+  shap_required_for_report: false
   model_zoo_enabled: true
   model_zoo_max_models: 8
   monte_carlo_paths: 400
   fail_on_stress_fragile: true
-  min_stress_worst_sharpe: -1.0
+  min_stress_worst_sharpe: -1
   fail_on_monte_carlo_unstable: false
   fail_on_low_live_readiness: false
   min_live_readiness: 55
@@ -362,20 +446,20 @@ engine4_training:
   min_auc_for_live: 0.515
   min_active_fold_frac: 0.4
   min_oos_trade_rate: 0.012
-  target_trade_rate: 0.06
+  target_trade_rate: 0.05
   target_trade_rate_by_tf:
-    M1: 0.035
-    M5: 0.055
-    M15: 0.09
-    M30: 0.08
-    H1: 0.07
-    H4: 0.08
+    M1: 0.03
+    M5: 0.035
+    M15: 0.032
+    M30: 0.045
+    H1: 0.025
+    H4: 0.05
   short_edge_multiple: 1.25
   short_edge_multiple_by_tf:
     M1: 1.45
     M5: 1.35
-    M15: 1.12
-    M30: 1.15
+    M15: 1.15
+    M30: 1.18
     H1: 1.25
     H4: 1.3
   max_train_bars: 10000
@@ -388,12 +472,12 @@ engine4_training:
     H4: 4000
   min_sharpe_ratio: 0.25
   max_drawdown_threshold: 0.25
-  min_trades_oos: 20
+  min_trades_oos: 18
   require_beat_buy_hold: true
-  commission_per_lot: 7.0
-  spread_pips: 30.0
-  slippage_pips: 5.0
-  min_rows: 80
+  commission_per_lot: 7
+  spread_pips: 30
+  slippage_pips: 5
+  min_rows: 201
   default_symbols:
   - XAUUSD
   default_timeframes:
@@ -441,13 +525,15 @@ engine5_live:
   prefer_final_model: true
   use_training_trade_policy: true
   final_model_any_timeframe: false
-  multi_tf_fusion: true
+  multi_tf_independent: true
+  multi_tf_fusion: false
   multi_tf_fusion_mode: weighted_consensus
   multi_tf_min_agree: 1
-  multi_tf_confirm: true
+  multi_tf_confirm: false
   multi_tf_mode: soft_veto
-  veto_opposite_htf: true
+  veto_opposite_htf: false
   min_confirm_agree: 1
+  max_open_positions_per_tf: 5
   confirm_timeframes:
   - H4
   - H1
@@ -478,6 +564,13 @@ engine5_live:
   min_side_probability: 0.2
   directional_edge: 0.12
   risk_per_trade_pct: 0.35
+  confidence_sizing_enabled: true
+  confidence_sizing_base: 1.0
+  confidence_sizing_max: 1.5
+  confidence_sizing_min: 0.25
+  shadow_tracking_enabled: true
+  shadow_min_decisions: 40
+  auto_retrain_request_enabled: true
   daily_loss_limit_pct: 3.0
   weekly_loss_limit_pct: 7.0
   max_open_positions: 20
@@ -488,10 +581,39 @@ engine5_live:
   use_live_spread_filter: false
   max_entry_spread_pips: 12.0
   tight_spread_pips: 12.0
-  stop_loss_atr_multiplier: 1.5
-  take_profit_atr_multiplier: 2.5
+  stop_loss_atr_multiplier: 1.2
+  take_profit_atr_multiplier: 1.8
+  dynamic_exits:
+    # Near-entry exits: local structure + live ATR (not distant historical S/R).
+    enabled: true
+    min_rr: 1.15
+    tp_confidence_min: 0.50
+    tp_confidence_max: 0.85
+    risk_dampen: 0.40
+    tp_atr_fallback_min: 0.9
+    tp_atr_fallback_max: 2.0
+    tp_atr_clamp_min: 0.6
+    tp_atr_clamp_max: 2.4
+    sl_atr_base: 0.85
+    sl_atr_risk_extra: 0.55
+    sl_atr_conf_tighten: 0.35
+    sl_atr_clamp_min: 0.45
+    sl_atr_clamp_max: 1.8
+    structure_buffer_atr: 0.12
+    structure_sl_max_atr: 1.6
+    structure_tp_max_atr: 2.0
+    structure_reach_max_atr: 2.2
+    structure_sl_min_vs_vol: 0.45
+    local_swing_lookback: 12
+    structure_tp_snap: true
+    skip_if_rr_below_min: true
   retrain_interval_days: 7
   kill_switch: false
+  pattern_overlay:
+    enabled: true
+    lookback_bars: 8
+    max_patterns: 40
+    poll_hint_ms: 250
 web:
   host: 127.0.0.1
   port: 8787

@@ -134,17 +134,30 @@ def deflated_sharpe_ratio(
 def probability_of_backtest_overfitting(
     path_is_sharpes: list[float],
     path_oos_sharpes: list[float],
+    *,
+    material_retention_min: float = 0.75,
 ) -> dict[str, float]:
     """PBO lite: fraction of paths where relative rank IS ≫ OOS (AFML Ch.11).
 
     For each combinatorial path, if the in-sample Sharpe rank exceeds OOS rank
     in the upper half while OOS is weak, count as overfit token.
+
+    With few CPCV-lite paths the raw rank-flip rate is coarse. ``material`` is
+    set only when elevated PBO co-occurs with mean OOS collapse vs IS
+    (``oos_retention`` < ``material_retention_min``); otherwise ``soft_warn``.
     """
     is_s = np.asarray(path_is_sharpes, dtype=float)
     oos_s = np.asarray(path_oos_sharpes, dtype=float)
     m = min(len(is_s), len(oos_s))
     if m < 4:
-        return {"pbo": 0.5, "n_paths": float(m), "reliable": 0.0}
+        return {
+            "pbo": 0.5,
+            "n_paths": float(m),
+            "reliable": 0.0,
+            "oos_retention": 1.0,
+            "material": 0.0,
+            "soft_warn": 0.0,
+        }
     is_s, oos_s = is_s[:m], oos_s[:m]
     # Rank correlation failure: high IS with low OOS
     is_rank = np.argsort(np.argsort(is_s)).astype(float) + 1.0
@@ -152,14 +165,81 @@ def probability_of_backtest_overfitting(
     # PBO: P(OOS rank < median | IS rank > median)
     high_is = is_rank >= np.median(is_rank)
     if not np.any(high_is):
-        return {"pbo": 0.5, "n_paths": float(m), "reliable": 0.0}
-    fail = np.sum(high_is & (oos_rank < np.median(oos_rank))) / float(np.sum(high_is))
+        return {
+            "pbo": 0.5,
+            "n_paths": float(m),
+            "reliable": 0.0,
+            "oos_retention": 1.0,
+            "material": 0.0,
+            "soft_warn": 0.0,
+        }
+    fail = float(np.sum(high_is & (oos_rank < np.median(oos_rank))) / float(np.sum(high_is)))
+    mean_is = float(np.mean(is_s))
+    mean_oos = float(np.mean(oos_s))
+    retention = float(mean_oos / mean_is) if abs(mean_is) > 1e-9 else 1.0
+    elevated = fail >= 0.55
+    material = 1.0 if elevated and retention < float(material_retention_min) else 0.0
+    soft_warn = 1.0 if elevated and material < 0.5 else 0.0
     return {
-        "pbo": float(fail),
+        "pbo": fail,
         "n_paths": float(m),
-        "mean_is_sharpe": float(np.mean(is_s)),
-        "mean_oos_sharpe": float(np.mean(oos_s)),
+        "mean_is_sharpe": mean_is,
+        "mean_oos_sharpe": mean_oos,
+        "oos_retention": retention,
+        "material": material,
+        "soft_warn": soft_warn,
         "reliable": 1.0,
+    }
+
+
+def pbo_hard_fail_decision(
+    pbo_report: dict[str, float] | None,
+    fit_diag: dict[str, Any] | None = None,
+    *,
+    cfg: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Shared gate logic: hard-fail vs soft-warn for elevated CPCV-lite PBO."""
+    cfg = cfg or {}
+    fit_diag = fit_diag or {}
+    pbo_report = pbo_report or {}
+    if not bool(cfg.get("fail_on_high_pbo", False)):
+        return {"hard_fail": False, "soft_warn": False, "reason": "gate_disabled"}
+    if float(pbo_report.get("reliable", 0) or 0) <= 0:
+        return {"hard_fail": False, "soft_warn": False, "reason": "unreliable"}
+    pbo_val = float(pbo_report.get("pbo", 0.0) or 0.0)
+    max_pbo = float(cfg.get("max_pbo", 0.55))
+    n_paths = float(pbo_report.get("n_paths", 0.0) or 0.0)
+    min_paths = float(cfg.get("pbo_min_paths_for_hard_fail", 6))
+    if pbo_val < max_pbo or n_paths < min_paths:
+        return {
+            "hard_fail": False,
+            "soft_warn": False,
+            "reason": "below_threshold",
+            "pbo": pbo_val,
+            "n_paths": n_paths,
+        }
+    mean_is = float(pbo_report.get("mean_is_sharpe", 0.0) or 0.0)
+    mean_oos = float(pbo_report.get("mean_oos_sharpe", 0.0) or 0.0)
+    gap_vt = float(fit_diag.get("sharpe_gap_val_test", 0.0) or 0.0)
+    fit_over = str(fit_diag.get("status") or "") == "overfitting"
+    oos_collapse = mean_is > 1.0 and mean_oos < mean_is * float(
+        cfg.get("pbo_oos_collapse_frac", 0.65)
+    )
+    material = float(pbo_report.get("material", 0.0) or 0.0) > 0.5
+    corroborate = fit_over or gap_vt >= float(cfg.get("pbo_corroborate_val_test_gap", 2.0)) or oos_collapse or material
+    require_corr = bool(cfg.get("pbo_require_corroboration", True)) and n_paths < float(
+        cfg.get("pbo_full_trust_paths", 10)
+    )
+    hard_fail = (not require_corr) or corroborate
+    return {
+        "hard_fail": bool(hard_fail),
+        "soft_warn": bool(not hard_fail),
+        "reason": "corroborated" if hard_fail else "rank_flip_only",
+        "pbo": pbo_val,
+        "n_paths": n_paths,
+        "corroborate": bool(corroborate),
+        "oos_collapse": bool(oos_collapse),
+        "material": bool(material),
     }
 
 

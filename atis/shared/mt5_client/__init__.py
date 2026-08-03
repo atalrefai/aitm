@@ -113,7 +113,11 @@ class MT5Client:
 
     def __init__(self) -> None:
         self._held = False
-        self._settings = load_mt5_settings()
+        self._settings = load_mt5_settings(force_reload=True)
+
+    def reload_settings(self) -> None:
+        """Refresh credentials from secrets.env / environment."""
+        self._settings = load_mt5_settings(force_reload=True)
 
     @property
     def connected(self) -> bool:
@@ -122,6 +126,7 @@ class MT5Client:
     def connect(self) -> None:
         """Acquire shared terminal connection (refcount). Safe under concurrency."""
         global _mt5_refcount, _mt5_process_connected
+        self.reload_settings()
         with _mt5_lock:
             if self._held:
                 if not _ipc_healthy():

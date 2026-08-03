@@ -109,13 +109,25 @@ def build_zoo_candidates(seed: int = 42, cfg: dict[str, Any] | None = None) -> l
             ),
         )
     )
+    regularize = bool(cfg.get("force_regularize_hp") or cfg.get("regularize_capacity"))
+    rf_depth = int(cfg.get("rf_max_depth", int(cfg.get("lgb_max_depth", 6)) + (0 if regularize else 2)))
+    if regularize:
+        rf_depth = min(rf_depth, int(cfg.get("rf_max_depth", 4) or 4))
+    rf_leaf = int(
+        cfg.get(
+            "rf_min_samples_leaf",
+            max(8, int(cfg.get("lgb_min_child_samples", 40) // (4 if regularize else 3))),
+        )
+    )
+    if regularize:
+        rf_leaf = max(rf_leaf, 25)
     out.append(
         (
             "random_forest",
             RandomForestClassifier(
-                n_estimators=180,
-                max_depth=int(cfg.get("lgb_max_depth", 6)) + 2,
-                min_samples_leaf=max(8, int(cfg.get("lgb_min_child_samples", 40) // 3)),
+                n_estimators=int(cfg.get("rf_estimators", 180)),
+                max_depth=max(2, rf_depth),
+                min_samples_leaf=max(4, rf_leaf),
                 class_weight="balanced_subsample",
                 random_state=seed,
                 n_jobs=-1,
@@ -126,9 +138,9 @@ def build_zoo_candidates(seed: int = 42, cfg: dict[str, Any] | None = None) -> l
         (
             "extra_trees",
             ExtraTreesClassifier(
-                n_estimators=200,
-                max_depth=int(cfg.get("lgb_max_depth", 6)) + 2,
-                min_samples_leaf=max(8, int(cfg.get("lgb_min_child_samples", 40) // 3)),
+                n_estimators=int(cfg.get("rf_estimators", 200)),
+                max_depth=max(2, rf_depth),
+                min_samples_leaf=max(4, rf_leaf),
                 class_weight="balanced",
                 random_state=seed,
                 n_jobs=-1,
@@ -197,12 +209,13 @@ def compare_model_zoo(
                 else:
                     model.fit(X_tr, y_tr)
                 acc = _safe_acc(model, X_va, y_va)
-            # Mild complexity penalty
+            # Mild complexity penalty (stronger under regularize so logistic/LGB win close races)
+            regularize = bool(cfg.get("force_regularize_hp") or cfg.get("regularize_capacity") or cfg.get("prefer_simpler_within_epsilon"))
             penalty = 0.0
             if name in {"random_forest", "extra_trees", "soft_vote"}:
-                penalty = 0.005
+                penalty = 0.02 if regularize else 0.005
             if name == "logistic":
-                penalty = -0.002  # prefer simple if close
+                penalty = -0.008 if regularize else -0.002  # prefer simple if close
             ranking.append({"family": name, "inner_val_acc": round(acc, 6), "score": round(acc - penalty, 6)})
         except Exception as exc:
             ranking.append({"family": name, "error": str(exc), "score": -1.0})

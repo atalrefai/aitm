@@ -363,11 +363,13 @@ def discover_deep_patterns(
         name = f"New{next_num}"
         used_nums.add(next_num)
         next_num += 1
+        desc = str(c.get("description") or "").strip()
+        display_name = f"{name} — {desc}" if desc else name
         results.append(
             {
                 "id": name,
                 "key": name,
-                "name": name,
+                "name": display_name,
                 "description": c["description"],
                 "mathematical_rules": c["mathematical_rules"],
                 "logical_rules": c["logical_rules"],

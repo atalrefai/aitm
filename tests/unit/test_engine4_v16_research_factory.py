@@ -9,8 +9,13 @@ import pandas as pd
 def test_pipeline_version_v16():
     from atis.engines.engine4_training import PIPELINE_VERSION
 
-    assert "v16" in PIPELINE_VERSION
-
+    assert "v16" in PIPELINE_VERSION or "v17" in PIPELINE_VERSION
+    assert (
+        "research-factory" in PIPELINE_VERSION
+        or "priority-hardening" in PIPELINE_VERSION
+        or "weakness-hardening" in PIPELINE_VERSION
+        or "self-diagnostic" in PIPELINE_VERSION
+    )
 
 def test_resolve_zoo_vs_nested_ensemble():
     from atis.engines.engine4_training.financial_hpo import resolve_zoo_vs_nested
@@ -23,6 +28,60 @@ def test_resolve_zoo_vs_nested_ensemble():
     )
     assert out["conflict"] is True
     assert out["selected_baseline"] == "ensemble"
+
+
+def test_resolve_zoo_vs_nested_single_family_default():
+    from atis.engines.engine4_training.financial_hpo import resolve_zoo_vs_nested
+
+    # Comparable scores (both positive acc-edge style) → zoo may win.
+    out = resolve_zoo_vs_nested(
+        nested_meta={"best_family": "logistic", "best_score": 0.2},
+        zoo_meta={"winner": "hist_gbm", "ranking": [{"family": "hist_gbm", "score": 0.25}]},
+        current_model_name="lightgbm",
+        cfg={"prefer_ensemble_on_conflict": False},
+    )
+    assert out["conflict"] is True
+    assert out["selected_baseline"] != "ensemble"
+    assert out["reason"] == "prefer_zoo_financial_proxy"
+
+
+def test_resolve_zoo_prefers_nested_when_scores_incomparable():
+    """M1 smell: nested expectancy_cost (~-0.6) vs zoo acc-edge (~0.26) must not auto-pick RF."""
+    from atis.engines.engine4_training.financial_hpo import resolve_zoo_vs_nested
+
+    out = resolve_zoo_vs_nested(
+        nested_meta={"best_family": "logistic", "best_score": -0.600971},
+        zoo_meta={
+            "winner": "random_forest",
+            "ranking": [{"family": "random_forest", "score": 0.26}],
+        },
+        current_model_name="rf",
+        cfg={"prefer_ensemble_on_conflict": False},
+    )
+    assert out["conflict"] is True
+    assert out["scores_comparable"] is False
+    assert out["selected_baseline"] == "logistic"
+    assert out["reason"] == "prefer_nested_incomparable_scores"
+
+
+def test_resolve_zoo_prefers_nested_under_regularize():
+    from atis.engines.engine4_training.financial_hpo import resolve_zoo_vs_nested
+
+    out = resolve_zoo_vs_nested(
+        nested_meta={"best_family": "logistic", "best_score": 0.22},
+        zoo_meta={
+            "winner": "random_forest",
+            "ranking": [{"family": "random_forest", "score": 0.28}],
+        },
+        current_model_name="rf",
+        cfg={
+            "prefer_ensemble_on_conflict": False,
+            "force_regularize_hp": True,
+            "prefer_simpler_within_epsilon": True,
+        },
+    )
+    assert out["selected_baseline"] == "logistic"
+    assert out["reason"] == "prefer_nested_simpler_under_regularize"
 
 
 def test_trade_level_and_expectancy_cost():
@@ -189,3 +248,87 @@ def test_confidence_position_size_bounds():
     assert 0.25 <= low <= 1.5
     assert 0.25 <= high <= 1.5
     assert high >= low
+
+
+def test_financial_proxy_penalizes_spam_trades():
+    from atis.engines.engine4_training.financial_hpo import financial_proxy_score
+
+    y = np.array([1, -1, 1, -1, 1, -1, 1, -1, 1, -1] * 5)
+    good = y.copy()
+    good[1::5] = 0  # ~80% trade rate tempered
+    spam_wrong = -np.ones_like(y)
+    assert financial_proxy_score(y, good) > financial_proxy_score(y, spam_wrong)
+
+
+def test_research_suggest_next_hypothesis():
+    from atis.engines.engine4_training.research_factory import suggest_next_hypothesis
+
+    hyp = suggest_next_hypothesis(
+        [],
+        {"use_promotion_validation_mode": False, "max_fold_trade_rate": 0.22},
+        stop=False,
+        stop_reason="continue",
+    )
+    assert hyp is not None
+    assert hyp["code"] == "cpcv_promotion"
+
+
+def test_shadow_retrain_advisory_helpers(tmp_path):
+    from atis.engines.engine4_training.shadow_challenger import (
+        read_retrain_advisory,
+        write_retrain_request,
+    )
+
+    adv = read_retrain_advisory(tmp_path)
+    assert adv.get("exists") is False
+    intel = tmp_path / "intelligence"
+    intel.mkdir(parents=True)
+    (intel / "retrain_advisory.json").write_text(
+        '{"would_trigger_now": true, "schedule_reason": "drift"}',
+        encoding="utf-8",
+    )
+    adv2 = read_retrain_advisory(tmp_path)
+    assert adv2.get("would_trigger_now") is True
+    req = write_retrain_request(tmp_path, reason="drift", source="test")
+    assert req["status"] == "pending"
+    assert (intel / "retrain_request.json").exists()
+
+
+def test_inflated_sharpe_and_early_folds():
+    from atis.engines.engine4_training.promotion_v16 import (
+        fold_stability_report,
+        inflated_sharpe_report,
+    )
+
+    infl = inflated_sharpe_report(
+        {"sharpe": 7.0, "sharpe_uncapped": 40.0, "trade_sharpe_raw": 0.05},
+        cfg={"fail_on_inflated_sharpe": True, "max_sharpe_uncapped": 20.0},
+    )
+    assert infl["inflated"] is True
+    assert infl["gate_pass"] is False
+
+    folds = [
+        {"accuracy": 0.52, "test_sharpe": -0.1, "val_sharpe": 6.0, "n_val_trades": 40, "trade_rate": 0.12},
+        {"accuracy": 0.51, "test_sharpe": 0.0, "val_sharpe": 6.0, "n_val_trades": 40, "trade_rate": 0.12},
+        {"accuracy": 0.75, "test_sharpe": 5.0, "val_sharpe": 7.0, "n_val_trades": 40, "trade_rate": 0.12},
+        {"accuracy": 0.76, "test_sharpe": 5.5, "val_sharpe": 7.2, "n_val_trades": 40, "trade_rate": 0.12},
+        {"accuracy": 0.74, "test_sharpe": 6.0, "val_sharpe": 7.1, "n_val_trades": 40, "trade_rate": 0.12},
+    ]
+    st = fold_stability_report(folds, cfg={"early_fold_frac": 0.4, "early_fold_min_acc": 0.58})
+    assert st["early_folds_weak"] is True
+
+
+def test_shap_fallback_without_tree():
+    from sklearn.linear_model import LogisticRegression
+    from atis.engines.engine4_training.feature_explainability import compute_shap_importance
+
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(200, 6))
+    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+    y = np.where(y == 0, -1, 1)
+    model = LogisticRegression(max_iter=200)
+    model.fit(X, y)
+    names = [f"f{i}" for i in range(6)]
+    out = compute_shap_importance(model, X, names, max_rows=80, seed=1)
+    assert out.get("enabled") is True
+    assert out.get("top")

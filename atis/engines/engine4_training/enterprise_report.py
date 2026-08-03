@@ -19,39 +19,92 @@ def propose_config_overrides(
     passed_gates: bool,
     history_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Suggest next-run knobs from current failure/success patterns (report-driven)."""
+    """Suggest next-run knobs from current failure/success patterns (report-driven).
+
+    Phase A: when Self-Diagnostic provides ``suggested_config_diff``, that is the
+    **only** knob set (one falsifiable hypothesis). Heuristic add-ons are notes only.
+    """
     fit = (metrics.get("fit_diagnosis") or {}).get("status") or ""
     gates = list(metrics.get("gate_failures") or [])
     cls = metrics.get("classification") or {}
     fin = metrics.get("financial_oos") or {}
     readiness = metrics.get("live_readiness") or {}
+    diagnosis = metrics.get("self_diagnosis") or {}
     tf = str(timeframe).upper()
     overrides: dict[str, Any] = {}
     notes: list[str] = []
+    unified = False
 
-    if tf == "H4" or "weak_expectancy" in gates or float(cls.get("roc_auc_ovr", 1) or 1) < 0.52:
-        overrides["barrier_atr_multiplier"] = 1.85
-        overrides["horizon_bars_delta"] = -1
-        overrides["use_meta_labeling"] = True
-        overrides["lgb_reg_lambda"] = 6.5
-        overrides["lgb_max_depth"] = 3
-        notes.append("H4/near-chance: tighten model + retune barriers/meta-label")
-    if fit == "overfitting" or "overfit" in "".join(gates):
-        overrides["lgb_max_depth"] = min(int(overrides.get("lgb_max_depth", 3)), 3)
-        overrides["lgb_min_child_samples"] = 200
-        overrides["lgb_reg_lambda"] = max(float(overrides.get("lgb_reg_lambda", 5.5)), 5.5)
-        overrides["lgb_colsample"] = 0.42
-        overrides["top_features"] = 40
-        notes.append("Overfit: stronger regularization + fewer features")
-    if "val_fold_liquidity" in gates or "deploy_holdout_trades" in gates:
-        overrides["min_trade_confidence"] = 0.50
-        overrides["cost_edge_multiple"] = 1.15
-        overrides["confidence_quantile"] = 0.78
-        notes.append("Liquidity starve: soften policy thresholds carefully")
-    if float(fin.get("expectancy", 0) or 0) <= 0:
-        overrides["latency_bars"] = 1
-        overrides["vol_slippage_k"] = 1.4
-        notes.append("Nonpositive expectancy: raise execution realism + edge multiple")
+    # Prefer Self-Diagnostic dominant knobs (one hypothesis / iteration) — exclusive
+    if diagnosis.get("suggested_config_diff"):
+        for k, v in dict(diagnosis["suggested_config_diff"]).items():
+            overrides[k] = v
+        top = (diagnosis.get("next_actions") or [{}])[0]
+        notes.append(
+            f"Self-diag [{diagnosis.get('primary_root_cause')}]: "
+            f"{top.get('hypothesis_ar') or top.get('hypothesis') or top.get('code')}"
+        )
+        unified = True
+    elif diagnosis.get("unified_hypothesis", {}).get("knobs"):
+        for k, v in dict(diagnosis["unified_hypothesis"]["knobs"]).items():
+            overrides[k] = v
+        notes.append(f"Unified hyp: {diagnosis['unified_hypothesis'].get('code')}")
+        unified = True
+
+    if not unified:
+        if tf == "H4" or "weak_expectancy" in gates or float(cls.get("roc_auc_ovr", 1) or 1) < 0.52:
+            overrides.setdefault("barrier_atr_multiplier", 1.85)
+            overrides.setdefault("horizon_bars_delta", -1)
+            overrides.setdefault("use_meta_labeling", True)
+            overrides.setdefault("lgb_reg_lambda", 6.5)
+            overrides.setdefault("lgb_max_depth", 3)
+            notes.append("H4/near-chance: tighten model + retune barriers/meta-label")
+        if fit == "overfitting" or "overfit" in "".join(gates):
+            overrides["lgb_max_depth"] = min(int(overrides.get("lgb_max_depth", 3)), 3)
+            overrides["lgb_min_child_samples"] = 200
+            overrides["lgb_reg_lambda"] = max(float(overrides.get("lgb_reg_lambda", 5.5)), 5.5)
+            overrides["lgb_colsample"] = 0.42
+            overrides["top_features"] = 40
+            notes.append("Overfit: stronger regularization + fewer features")
+        if "trade_rate_saturated" in gates or (metrics.get("fold_stability") or {}).get("trade_rate_pegged"):
+            overrides.setdefault("quality_first_trade_policy", True)
+            cur_cap = float(overrides.get("max_fold_trade_rate", 0.09) or 0.09)
+            new_cap = round(max(0.035, cur_cap * 0.70), 3)
+            if abs(new_cap - cur_cap) < 1e-9:
+                new_cap = round(max(0.028, cur_cap * 0.75), 3)
+            overrides.setdefault("max_fold_trade_rate", new_cap)
+            overrides.setdefault("fail_on_trade_rate_saturated", True)
+            overrides["min_trade_confidence"] = max(float(overrides.get("min_trade_confidence", 0.56) or 0.56), 0.58)
+            overrides["confidence_quantile"] = max(float(overrides.get("confidence_quantile", 0.88) or 0.88), 0.90)
+            overrides["directional_edge"] = max(float(overrides.get("directional_edge", 0.16) or 0.16), 0.18)
+            if cur_cap <= 0.055:
+                overrides["min_trade_confidence"] = max(float(overrides["min_trade_confidence"]), 0.60)
+                overrides["confidence_quantile"] = min(max(float(overrides["confidence_quantile"]), 0.93), 0.95)
+                overrides["directional_edge"] = max(float(overrides["directional_edge"]), 0.20)
+            notes.append("Saturation: quality-first desaturate + edge-based selection")
+        if "inflated_sharpe" in gates or (metrics.get("sharpe_inflation") or {}).get("inflated"):
+            overrides.setdefault("fail_on_inflated_sharpe", True)
+            overrides.setdefault("max_sharpe_uncapped", 12.0)
+            overrides.setdefault("rank_by_trade_sharpe", True)
+            notes.append("Inflation: demote uncapped path Sharpe; enforce trade-level primary")
+        if "val_fold_liquidity" in gates or "deploy_holdout_trades" in gates:
+            overrides["min_trade_confidence"] = 0.52
+            overrides["cost_edge_multiple"] = 1.20
+            overrides["confidence_quantile"] = 0.84
+            notes.append("Liquidity starve: soften policy thresholds carefully")
+        if float(fin.get("expectancy", 0) or 0) <= 0:
+            overrides["latency_bars"] = 1
+            overrides["vol_slippage_k"] = 1.4
+            notes.append("Nonpositive expectancy: raise execution realism + edge multiple")
+    else:
+        # Advisory notes only — do not merge conflicting knobs onto diagnosis diff
+        if tf == "H4" or float(cls.get("roc_auc_ovr", 1) or 1) < 0.52:
+            notes.append("(advisory) H4/near-chance still observed — diagnosis knobs take precedence")
+        if "trade_rate_saturated" in gates or (metrics.get("fold_stability") or {}).get("trade_rate_pegged"):
+            notes.append("(advisory) saturation still present — covered by diagnosis if TradePolicy")
+        if fit == "overfitting":
+            notes.append("(advisory) overfit flag — diagnosis regularize_capacity if Model/HP")
+
     if readiness.get("verdict") in {"live_ready", "paper_ready"} and passed_gates:
         notes.append("Keep champion settings; schedule PSI drift monitor only")
 
@@ -71,10 +124,12 @@ def propose_config_overrides(
                     "delta_sharpe": round(delta, 4),
                     "n_prior_episodes": len(eps),
                 }
-                if delta < -1.0:
+                if delta < -1.0 and not unified:
                     notes.append("Performance regress vs prior episode — prefer last champion HP")
                     overrides.setdefault("lgb_reg_lambda", 5.5)
                     overrides.setdefault("top_features", 40)
+                elif delta < -1.0:
+                    notes.append("(advisory) Performance regress vs prior episode")
         except Exception:
             pass
 
@@ -83,6 +138,10 @@ def propose_config_overrides(
         "overrides": overrides,
         "notes": notes,
         "history": hist_note,
+        "primary_root_cause": diagnosis.get("primary_root_cause"),
+        "unified_from_diagnosis": unified,
+        "hypothesis_code": (diagnosis.get("unified_hypothesis") or {}).get("code")
+        or ((diagnosis.get("next_actions") or [{}])[0].get("code") if diagnosis else None),
         "updated_at": _utc(),
     }
 
@@ -98,12 +157,97 @@ _APPLY_OVERRIDE_KEYS = {
     "min_trade_confidence",
     "cost_edge_multiple",
     "confidence_quantile",
+    "directional_edge",
+    "quality_first_trade_policy",
     "latency_bars",
     "vol_slippage_k",
+    "max_fold_trade_rate",
+    "target_trade_rate",
+    "fail_on_trade_rate_saturated",
+    "fail_on_inflated_sharpe",
+    "max_sharpe_uncapped",
+    "rank_by_trade_sharpe",
+    "max_uncapped_to_capped_ratio",
+    "min_trade_sharpe_raw",
+    "early_fold_min_acc",
+    "promotion_validation_mode",
+    "use_promotion_validation_mode",
+    "stable_feature_min_frac",
+    "quarantine_h4_confirm",
+    "fail_h4_near_chance",
+    "auto_drop_unstable_features",
+    "barrier_sweep_enabled",
+    "fail_on_filter_driven_edge",
+    "data_intel_hard",
+    "dq_gate_hard",
+    "dq_gate_min_score",
+    # Gate thresholds must not auto-tighten via knowledge loop (reject spiral).
+    # "val_test_sharpe_gap_hard_max" intentionally excluded.
+    "fail_on_crisis_holdout_weak",
+    "fail_on_unstable_generalization",
+    "fail_on_early_folds_weak",
+    "nested_hp_train_val_gap_penalty",
+    "prefer_simpler_within_epsilon",
+    "prefer_nested_on_capacity_conflict",
+    "rf_max_depth",
+    "rf_min_samples_leaf",
+    "rf_estimators",
+    "penalize_pegged_trade_rate_in_hpo",
+    "policy_min_agree_folds",
+    "time_decay_half_life",
+    "early_fold_min_auc",
+    "label_cleaning_enabled",
+    "honest_val_sharpe_from_folds",
+    "honest_val_cap_by_fold_test",
+    "honest_val_fold_test_slack",
+    "tune_policy_mode",
+    "stabilize_early_fold_signal",
+    "force_regularize_hp",
+    "regularize_capacity",
+    "regime_balanced_holdouts",
+    "fail_on_regime_balanced_holdouts",
+    "regime_balanced_min_regimes",
+    "quality_compound_enabled",
+    "quality_first_cap_headroom_frac",
+}
+
+# Scalar knobs that are later resolved via *_by_tf maps. Without syncing the map
+# for the active TF, pending/self-optimize overrides are silently ignored (H1
+# trade_rate_saturated loop: max_fold_trade_rate=0.05 overridden by by_tf H1=0.09).
+_TF_SCOPED_OVERRIDE_MAPS: dict[str, str] = {
+    "max_fold_trade_rate": "max_fold_trade_rate_by_tf",
+    "target_trade_rate": "target_trade_rate_by_tf",
+    "confidence_quantile": "confidence_quantile_by_tf",
+    "cost_edge_multiple": "cost_edge_multiple_by_tf",
+    "short_edge_multiple": "short_edge_multiple_by_tf",
+    "barrier_atr_multiplier": "barrier_atr_multiplier_by_tf",
+    "top_features": "top_features_by_tf",
+    "stable_feature_min_frac": "stable_feature_min_frac_by_tf",
+    "use_meta_labeling": "use_meta_labeling_by_tf",
 }
 
 
-def apply_pending_overrides(cfg: dict[str, Any], history_path: Path) -> dict[str, Any]:
+def sync_tf_scoped_override(cfg: dict[str, Any], key: str, val: Any, timeframe: str | None) -> None:
+    """Write scalar override into the matching *_by_tf map for ``timeframe``."""
+    if not timeframe:
+        return
+    map_key = _TF_SCOPED_OVERRIDE_MAPS.get(key)
+    if not map_key:
+        return
+    tf = str(timeframe).upper().strip()
+    if not tf:
+        return
+    m = dict(cfg.get(map_key) or {})
+    m[tf] = val
+    cfg[map_key] = m
+
+
+def apply_pending_overrides(
+    cfg: dict[str, Any],
+    history_path: Path,
+    *,
+    timeframe: str | None = None,
+) -> dict[str, Any]:
     """Merge last-run self-optimize knobs into this run's config (closed-loop learning)."""
     applied: dict[str, Any] = {}
     if not history_path.exists():
@@ -115,6 +259,7 @@ def apply_pending_overrides(cfg: dict[str, Any], history_path: Path) -> dict[str
     pending = dict(raw.get("pending_overrides") or {})
     if not pending:
         return applied
+    tf = str(timeframe or "").upper().strip() or None
     for key, val in pending.items():
         if key == "horizon_bars_delta":
             try:
@@ -127,6 +272,7 @@ def apply_pending_overrides(cfg: dict[str, Any], history_path: Path) -> dict[str
             continue
         if key in _APPLY_OVERRIDE_KEYS:
             cfg[key] = val
+            sync_tf_scoped_override(cfg, key, val, tf)
             applied[key] = val
     return applied
 
@@ -204,6 +350,22 @@ def write_enterprise_report(path: Path, payload: dict[str, Any]) -> None:
         "",
         "## 7. Gate Failures",
         *( [f"- `{g}`" for g in gates] if gates else ["- (none)"] ),
+        "",
+        "## 7b. Self-Diagnostic (Causal)",
+        f"- Primary root cause: **{(m.get('self_diagnosis') or {}).get('primary_root_cause')}** — {(m.get('self_diagnosis') or {}).get('primary_root_cause_ar')}",
+        (
+            f"- Honesty/Generalization/Live/Consistency: "
+            f"{(m.get('self_diagnosis') or {}).get('metric_honesty_score')}/"
+            f"{(m.get('self_diagnosis') or {}).get('generalization_score')}/"
+            f"{(m.get('self_diagnosis') or {}).get('live_tradability_score')}/"
+            f"{(m.get('consistency') or {}).get('score') or (m.get('self_diagnosis') or {}).get('consistency_score')}"
+        ),
+        f"- Quality compound: {(m.get('quality_compound') or {}).get('score')} · penalties={(m.get('quality_compound') or {}).get('penalties')}",
+        f"- Safe for live: {((m.get('self_diagnosis') or {}).get('safe_for_live') or {}).get('verdict')} — {((m.get('self_diagnosis') or {}).get('safe_for_live') or {}).get('verdict_ar')}",
+        f"- Unified hypothesis: `{(m.get('unified_hypothesis') or (m.get('self_diagnosis') or {}).get('unified_hypothesis') or {}).get('code')}`",
+        f"- Narrative AR: {(m.get('self_diagnosis') or {}).get('narrative_ar')}",
+        f"- Suggested config diff: `{(m.get('self_diagnosis') or {}).get('suggested_config_diff')}`",
+        f"- Self-opt unified_from_diagnosis: {self_opt.get('unified_from_diagnosis')}",
         "",
         "## 8. Why this model / critique",
         f"- Strengths: {critique.get('strengths')}",

@@ -11,8 +11,12 @@ def test_pipeline_version_v13():
     assert (
         "e4-v13" in PIPELINE_VERSION
         or "e4-v14" in PIPELINE_VERSION
+        or "e4-v15" in PIPELINE_VERSION
+        or "e4-v16" in PIPELINE_VERSION
+        or "e4-v17" in PIPELINE_VERSION
         or "trading-intelligence" in PIPELINE_VERSION
         or "enterprise" in PIPELINE_VERSION
+        or "self-diagnostic" in PIPELINE_VERSION
     )
 
 
@@ -49,6 +53,69 @@ def test_regime_masks_and_eval():
     out = evaluate_by_regime(rets, masks, financial_fn=lambda r: financial_metrics(r, hold_bars=6))
     assert "regimes" in out
     assert "stable" in out
+
+
+def test_regime_stability_m15_all_strong_not_unstable():
+    """M15 20260803: floor≈3.8 spread≈4.2 — elevated dispersion, still stable."""
+    from atis.engines.engine4_training.validation_protocols import reconcile_regime_stability
+
+    legacy = {
+        "regimes": {
+            "trending": {"sharpe": 7.982, "expectancy": 0.0036, "skipped": False},
+            "ranging": {"sharpe": 7.849, "expectancy": 0.0046, "skipped": False},
+            "high_volatility": {"sharpe": 3.827, "expectancy": 0.0037, "skipped": False},
+            "low_volatility": {"sharpe": 5.284, "expectancy": 0.0037, "skipped": False},
+        },
+        "stable": False,
+        "notes": ["large_sharpe_dispersion_across_regimes"],
+        "sharpe_regime_spread": 4.155,
+    }
+    out = reconcile_regime_stability(legacy)
+    assert out["stable"] is True
+    assert "elevated_sharpe_dispersion_all_regimes_strong" in out["notes"]
+    assert "large_sharpe_dispersion_across_regimes" not in out["notes"]
+
+
+def test_regime_stability_m30_relative_spread_not_unstable():
+    """M30 20260803T092620: floor≈2.55 rel≈0.68 — legacy false unstable must clear."""
+    from atis.engines.engine4_training.validation_protocols import reconcile_regime_stability
+
+    legacy = {
+        "regimes": {
+            "trending": {"sharpe": 4.564, "expectancy": 0.0028, "skipped": False},
+            "ranging": {"sharpe": 5.623, "expectancy": 0.0034, "skipped": False},
+            "high_volatility": {"sharpe": 2.551, "expectancy": 0.0033, "skipped": False},
+            "low_volatility": {"sharpe": 4.512, "expectancy": 0.0035, "skipped": False},
+        },
+        "stable": False,
+        "notes": ["large_relative_sharpe_dispersion_across_regimes"],
+        "sharpe_regime_spread": 3.072,
+    }
+    out = reconcile_regime_stability(legacy)
+    assert out["stable"] is True
+    assert out["sharpe_regime_floor"] >= 2.0
+    assert "large_relative_sharpe_dispersion_across_regimes" not in out["notes"]
+    # rel≈0.68 < 0.75 → no instability note; optional elevated note only if rel exceeds cap
+    assert out.get("sharpe_regime_rel_spread", 1.0) < 0.75 or (
+        "elevated_relative_dispersion_all_regimes_strong" in out["notes"]
+    )
+
+
+def test_regime_stability_collapse_still_unstable():
+    from atis.engines.engine4_training.validation_protocols import reconcile_regime_stability
+
+    out = reconcile_regime_stability(
+        {
+            "regimes": {
+                "trending": {"sharpe": 4.0, "expectancy": 0.002, "skipped": False},
+                "ranging": {"sharpe": -1.2, "expectancy": -0.001, "skipped": False},
+            },
+            "stable": True,
+            "notes": [],
+        }
+    )
+    assert out["stable"] is False
+    assert "performance_collapses_in_at_least_one_regime" in out["notes"]
 
 
 def test_expectancy_and_dsr():

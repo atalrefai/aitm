@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -13,9 +15,11 @@ def test_pipeline_v14():
         "e4-v14" in PIPELINE_VERSION
         or "e4-v15" in PIPELINE_VERSION
         or "e4-v16" in PIPELINE_VERSION
+        or "e4-v17" in PIPELINE_VERSION
         or "enterprise" in PIPELINE_VERSION
         or "intelligent-training" in PIPELINE_VERSION
         or "research-factory" in PIPELINE_VERSION
+        or "priority-hardening" in PIPELINE_VERSION
     )
 
 
@@ -102,6 +106,56 @@ def test_apply_pending_overrides(tmp_path):
     assert cfg["latency_bars"] == 1
     assert cfg["horizon_bars"] == 5
     assert "lgb_max_depth" in applied
+
+
+def test_apply_pending_overrides_syncs_by_tf(tmp_path):
+    """H1 saturation loop: scalar max_fold_trade_rate must update by_tf or it is ignored."""
+    from atis.engines.engine4_training.enterprise_report import apply_pending_overrides
+
+    p = tmp_path / "knowledge_loop.json"
+    p.write_text(
+        json.dumps(
+            {
+                "pending_overrides": {
+                    "max_fold_trade_rate": 0.05,
+                    "confidence_quantile": 0.93,
+                    "target_trade_rate": 0.035,
+                    "min_trade_confidence": 0.58,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = {
+        "max_fold_trade_rate": 0.09,
+        "max_fold_trade_rate_by_tf": {"H1": 0.09, "M15": 0.08},
+        "confidence_quantile": 0.9,
+        "confidence_quantile_by_tf": {"H1": 0.9},
+        "target_trade_rate": 0.055,
+        "target_trade_rate_by_tf": {"H1": 0.055},
+    }
+    applied = apply_pending_overrides(cfg, p, timeframe="H1")
+    assert cfg["max_fold_trade_rate"] == 0.05
+    assert cfg["max_fold_trade_rate_by_tf"]["H1"] == 0.05
+    assert cfg["max_fold_trade_rate_by_tf"]["M15"] == 0.08  # other TF untouched
+    assert cfg["confidence_quantile_by_tf"]["H1"] == 0.93
+    assert cfg["target_trade_rate_by_tf"]["H1"] == 0.035
+    assert applied["max_fold_trade_rate"] == 0.05
+
+
+def test_low_cap_trade_rate_peg_detection():
+    from atis.engines.engine4_training.promotion_v16 import fold_stability_report
+
+    folds = [
+        {"n_val_trades": 40, "policy": {"val_sharpe": 8.0}, "trade_rate": 0.05, "accuracy": 0.75, "test_sharpe": 6.0},
+        {"n_val_trades": 35, "policy": {"val_sharpe": 8.2}, "trade_rate": 0.049, "accuracy": 0.74, "test_sharpe": 5.8},
+        {"n_val_trades": 30, "policy": {"val_sharpe": 7.9}, "trade_rate": 0.05, "accuracy": 0.76, "test_sharpe": 6.1},
+        {"n_val_trades": 30, "policy": {"val_sharpe": 8.1}, "trade_rate": 0.048, "accuracy": 0.73, "test_sharpe": 5.5},
+        {"n_val_trades": 30, "policy": {"val_sharpe": 8.0}, "trade_rate": 0.05, "accuracy": 0.75, "test_sharpe": 6.0},
+    ]
+    st = fold_stability_report(folds, cfg={"max_fold_trade_rate": 0.05, "fail_on_fold_unstable": True})
+    assert st["trade_rate_pegged"] is True
+    assert st["trade_rate_peg_threshold"] <= 0.05
 
 
 def test_live_readiness_and_critique():

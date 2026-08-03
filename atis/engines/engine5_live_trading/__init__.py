@@ -24,6 +24,10 @@ from atis.config import (
 from atis.engines.engine4_training.deep_learning import HAS_TORCH, load_llmodel, predict_with_llmodel
 from atis.engines.engine2_cleaning import clean_dataframe
 from atis.engines.engine3_features import features_parquet_path
+from atis.engines.engine5_live_trading.dynamic_exits import (
+    aggregate_prediction_exits,
+    compute_dynamic_sl_tp,
+)
 from atis.shared.data_registry import DataStateRegistry
 from atis.shared.feature_engine import compute_features, load_indicators_config
 from atis.shared.logging_utils import get_logger
@@ -57,6 +61,9 @@ class TradeRecord:
     reason: str
     ts: str
     mode: str
+    pattern_keys: list[str] = field(default_factory=list)
+    pattern_ids: list[str] = field(default_factory=list)
+    pattern_summary: str = ""
 
 
 @dataclass
@@ -314,25 +321,43 @@ def _symbol_matches(position_symbol: str, wanted: str) -> bool:
     return a == b or a.startswith(b) or b.startswith(a) or b in a or a in b
 
 
+def _comment_timeframe(comment: str | None) -> str | None:
+    """Parse timeframe from ATIS order comment ``ATIS|H1`` / ``ATIS|H1|tag``."""
+    parts = str(comment or "").strip().split("|")
+    if len(parts) < 2:
+        return None
+    if str(parts[0]).strip().upper() != "ATIS":
+        return None
+    tf = str(parts[1] or "").strip().upper()
+    return tf or None
+
+
 def filter_atis_positions(
     positions: list[Any] | None,
     symbol: str | None = None,
     *,
     magic: int = ATIS_MAGIC,
     atis_only: bool = True,
+    timeframe: str | None = None,
 ) -> list[Any]:
-    """Count only ATIS-managed positions (optional symbol filter)."""
+    """Count only ATIS-managed positions (optional symbol / timeframe filter)."""
+    want_tf = str(timeframe or "").strip().upper() or None
     out: list[Any] = []
     for pos in positions or []:
         try:
             pos_magic = int(getattr(pos, "magic", 0) or 0)
             pos_symbol = str(getattr(pos, "symbol", "") or "")
+            pos_comment = str(getattr(pos, "comment", "") or "")
         except Exception:
             continue
         if atis_only and pos_magic != int(magic):
             continue
         if symbol and not _symbol_matches(pos_symbol, symbol):
             continue
+        if want_tf:
+            pos_tf = _comment_timeframe(pos_comment)
+            if pos_tf != want_tf:
+                continue
         out.append(pos)
     return out
 
@@ -596,6 +621,7 @@ def _sl_tp_from_atr(
     sl_mult: float,
     tp_mult: float,
 ) -> tuple[float, float]:
+    """Legacy fixed ATR×multiplier exits (used only when dynamic_exits.enabled is false)."""
     if side == "buy":
         sl = price - sl_mult * atr_value
         tp = price + tp_mult * atr_value
@@ -605,11 +631,126 @@ def _sl_tp_from_atr(
     return float(sl), float(tp)
 
 
-def build_order_comment(timeframe: str, *, prefix: str = "ATIS") -> str:
-    """MT5 order comment — always includes the signal timeframe (max 31 chars)."""
+def resolve_sl_tp(
+    *,
+    price: float,
+    side: str,
+    atr_value: float,
+    confidence: float,
+    featured: pd.DataFrame,
+    prediction_debug: dict[str, Any] | None = None,
+    sl_mult: float = 1.5,
+    tp_mult: float = 2.5,
+    cfg: dict[str, Any] | None = None,
+) -> tuple[float, float, dict[str, Any]]:
+    """Prefer model-driven dynamic exits; fall back to fixed ATR multipliers."""
+    cfg = cfg if cfg is not None else _cfg()
+    dyn_cfg = dict(cfg.get("dynamic_exits") or {})
+    dbg = prediction_debug or {}
+    if bool(dyn_cfg.get("enabled", True)):
+        exits = compute_dynamic_sl_tp(
+            price=price,
+            side=side,
+            atr_value=atr_value,
+            confidence=confidence,
+            featured=featured,
+            expected_return=_finite_or_none(dbg.get("expected_return")),
+            risk_score=_finite_or_none(dbg.get("risk_score")),
+            cfg=dyn_cfg,
+        )
+        return exits.sl, exits.tp, exits.as_dict()
+    sl, tp = _sl_tp_from_atr(price, side, atr_value, sl_mult, tp_mult)
+    return sl, tp, {
+        "method": "fixed_atr_multipliers",
+        "sl": sl,
+        "tp": tp,
+        "sl_mult": sl_mult,
+        "tp_mult": tp_mult,
+    }
+
+
+def _finite_or_none(value: Any) -> float | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(v):
+        return None
+    return v
+
+
+def build_order_comment(
+    timeframe: str,
+    *,
+    prefix: str = "ATIS",
+    pattern_tag: str | None = None,
+) -> str:
+    """MT5 order comment — timeframe + optional pattern tag (max 31 chars)."""
     tf = str(timeframe or "").strip().upper() or "?"
-    raw = f"{prefix}|{tf}"
+    tag = (pattern_tag or "").strip().replace("pat_", "").replace("cmp_", "")[:10]
+    raw = f"{prefix}|{tf}|{tag}" if tag else f"{prefix}|{tf}"
     return raw[:31]
+
+
+def _sync_pattern_overlay(
+    client: MT5Client,
+    featured: pd.DataFrame,
+    *,
+    symbol: str,
+    timeframe: str,
+) -> dict[str, Any]:
+    """Detect patterns and publish async MT5 chart drawings (never raises)."""
+    cfg = _cfg()
+    overlay_cfg = cfg.get("pattern_overlay") or {}
+    if not bool(overlay_cfg.get("enabled", True)):
+        return {"enabled": False}
+    try:
+        from atis.shared.mt5_pattern_overlay import get_overlay_service
+
+        service = get_overlay_service(cfg)
+        broker_symbol = client.resolve_symbol(symbol)
+        service.set_terminal_info_provider(lambda: client.terminal_info())
+        overlays = service.sync_from_features(
+            featured,
+            symbol=symbol,
+            timeframe=timeframe,
+            broker_symbol=broker_symbol,
+        )
+        return {
+            "enabled": True,
+            "count": len(overlays),
+            "keys": [o.key for o in overlays[:12]],
+            "ids": [o.id for o in overlays[:12]],
+        }
+    except Exception as exc:
+        logger.warning("pattern_overlay_sync_failed", symbol=symbol, error=str(exc))
+        return {"enabled": True, "error": str(exc)}
+
+
+def _link_trade_to_patterns(
+    *,
+    side: str,
+    ticket: int | None,
+    reason: str,
+) -> dict[str, Any]:
+    cfg = _cfg()
+    if not bool((cfg.get("pattern_overlay") or {}).get("enabled", True)):
+        return {}
+    try:
+        from atis.shared.mt5_pattern_overlay import get_overlay_service
+
+        service = get_overlay_service(cfg)
+        linked = service.link_trade(side=side, ticket=ticket, reason=reason)
+        explain = service.explain_decision(side)
+        return {
+            "pattern_keys": [p.key for p in linked],
+            "pattern_ids": [p.id for p in linked],
+            "pattern_summary": explain.get("summary", ""),
+            "explain": explain,
+        }
+    except Exception as exc:
+        logger.warning("pattern_trade_link_failed", error=str(exc))
+        return {"error": str(exc)}
 
 
 def send_market_order(
@@ -657,6 +798,180 @@ def send_market_order(
     if result is None:
         raise RuntimeError(f"order_send returned None: {mt5.last_error()}")
     return result._asdict()
+
+
+def _position_filling_mode(info: Any, mt5: Any) -> Any:
+    filling = mt5.ORDER_FILLING_IOC
+    try:
+        mode = int(getattr(info, "filling_mode", 0) or 0)
+    except Exception:
+        mode = 0
+    if mode & 1:
+        filling = mt5.ORDER_FILLING_FOK
+    elif mode & 2:
+        filling = mt5.ORDER_FILLING_IOC
+    return filling
+
+
+def serialize_position(pos: Any, mt5: Any | None = None) -> dict[str, Any]:
+    """Normalize an MT5 position object into a JSON-safe dict."""
+    mt5 = mt5 or _mt5_module()
+    try:
+        pos_type = int(getattr(pos, "type", -1))
+    except Exception:
+        pos_type = -1
+    side = "buy" if pos_type == getattr(mt5, "POSITION_TYPE_BUY", 0) else "sell"
+    profit = float(getattr(pos, "profit", 0) or 0)
+    swap = float(getattr(pos, "swap", 0) or 0)
+    return {
+        "ticket": int(getattr(pos, "ticket", 0) or 0),
+        "symbol": str(getattr(pos, "symbol", "") or ""),
+        "side": side,
+        "type": pos_type,
+        "volume": float(getattr(pos, "volume", 0) or 0),
+        "price_open": float(getattr(pos, "price_open", 0) or 0),
+        "price_current": float(getattr(pos, "price_current", 0) or 0),
+        "sl": float(getattr(pos, "sl", 0) or 0),
+        "tp": float(getattr(pos, "tp", 0) or 0),
+        "profit": profit,
+        "swap": swap,
+        "net_profit": profit + swap,
+        "magic": int(getattr(pos, "magic", 0) or 0),
+        "comment": str(getattr(pos, "comment", "") or ""),
+        "time": int(getattr(pos, "time", 0) or 0),
+    }
+
+
+def list_open_positions(
+    client: MT5Client,
+    symbol: str | None = None,
+    *,
+    atis_only: bool = True,
+    magic: int = ATIS_MAGIC,
+) -> list[dict[str, Any]]:
+    """List currently open positions managed by ATIS (optionally all)."""
+    mt5 = _mt5_module()
+    raw = list(mt5.positions_get() or [])
+    tracked = filter_atis_positions(raw, symbol, magic=magic, atis_only=atis_only)
+    return [serialize_position(pos, mt5) for pos in tracked]
+
+
+def close_position(
+    client: MT5Client,
+    ticket: int,
+    *,
+    comment: str = "ATIS close",
+) -> dict[str, Any]:
+    """Close a single open position by ticket via opposite market deal."""
+    mt5 = _mt5_module()
+    positions = list(mt5.positions_get(ticket=int(ticket)) or [])
+    if not positions:
+        raise ValueError(f"position_not_found:{ticket}")
+    pos = positions[0]
+    symbol = str(getattr(pos, "symbol", "") or "")
+    volume = float(getattr(pos, "volume", 0) or 0)
+    if volume <= 0:
+        raise ValueError(f"invalid_volume:{ticket}")
+
+    info = mt5.symbol_info(symbol)
+    tick = mt5.symbol_info_tick(symbol)
+    if info is None or tick is None:
+        # Try resolve via client cache for broker suffixes
+        try:
+            resolved = client.resolve_symbol(symbol)
+            info = mt5.symbol_info(resolved)
+            tick = mt5.symbol_info_tick(resolved)
+            symbol = resolved
+        except Exception:
+            pass
+    if info is None or tick is None:
+        raise RuntimeError(f"No tick/info for {symbol}")
+
+    pos_type = int(getattr(pos, "type", -1))
+    is_buy = pos_type == getattr(mt5, "POSITION_TYPE_BUY", 0)
+    order_type = mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY
+    price = float(tick.bid if is_buy else tick.ask)
+
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": symbol,
+        "volume": volume,
+        "type": order_type,
+        "position": int(ticket),
+        "price": price,
+        "deviation": 20,
+        "magic": int(getattr(pos, "magic", ATIS_MAGIC) or ATIS_MAGIC),
+        "comment": comment[:31],
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": _position_filling_mode(info, mt5),
+    }
+    result = mt5.order_send(request)
+    if result is None:
+        raise RuntimeError(f"order_send returned None: {mt5.last_error()}")
+    payload = result._asdict()
+    retcode = int(payload.get("retcode", -1))
+    ok = retcode in (
+        getattr(mt5, "TRADE_RETCODE_DONE", 10009),
+        getattr(mt5, "TRADE_RETCODE_DONE_PARTIAL", 10010),
+    )
+    return {
+        "ok": ok,
+        "ticket": int(ticket),
+        "symbol": symbol,
+        "side": "buy" if is_buy else "sell",
+        "volume": volume,
+        "profit": float(getattr(pos, "profit", 0) or 0),
+        "retcode": retcode,
+        "comment": str(payload.get("comment", "") or ""),
+        "mt5": payload,
+    }
+
+
+def close_positions_filtered(
+    client: MT5Client,
+    *,
+    mode: str = "all",
+    symbol: str | None = None,
+    atis_only: bool = True,
+    magic: int = ATIS_MAGIC,
+) -> dict[str, Any]:
+    """Close open positions: all | winners | losers."""
+    mode_key = str(mode or "all").strip().lower()
+    if mode_key not in {"all", "winners", "losers"}:
+        raise ValueError(f"invalid_close_mode:{mode}")
+
+    positions = list_open_positions(client, symbol, atis_only=atis_only, magic=magic)
+    selected: list[dict[str, Any]] = []
+    for pos in positions:
+        net = float(pos.get("net_profit", pos.get("profit", 0)) or 0)
+        if mode_key == "winners" and net <= 0:
+            continue
+        if mode_key == "losers" and net >= 0:
+            continue
+        selected.append(pos)
+
+    closed: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    for pos in selected:
+        ticket = int(pos["ticket"])
+        try:
+            result = close_position(client, ticket, comment=f"ATIS {mode_key}")
+            if result.get("ok"):
+                closed.append(result)
+            else:
+                failed.append(result)
+        except Exception as exc:
+            failed.append({"ok": False, "ticket": ticket, "error": str(exc)})
+
+    return {
+        "mode": mode_key,
+        "matched": len(selected),
+        "closed": closed,
+        "failed": failed,
+        "closed_count": len(closed),
+        "failed_count": len(failed),
+        "ok": len(failed) == 0,
+    }
 
 
 def fetch_recent_bars(client: MT5Client, symbol: str, timeframe: str, bars: int = 300) -> pd.DataFrame:
@@ -823,6 +1138,7 @@ def _place_from_signal(
     tp_mult: float,
     trades_log: Path,
     reason_suffix: str = "",
+    prediction_debug: dict[str, Any] | None = None,
 ) -> None:
     # Gate 1 (mandatory): trained model / fused TF signal — never enter on spread alone.
     if pred == 0 or conf < conf_thr:
@@ -865,12 +1181,34 @@ def _place_from_signal(
     report.signals += 1
     working = list(positions)
     placed = 0
+    # Independent multi-TF: cap by this TF's own open book, and still respect global max.
+    scope_by_tf = bool(cfg.get("multi_tf_independent", True)) and not bool(
+        cfg.get("multi_tf_fusion", False)
+    )
+    max_per_tf = int(cfg.get("max_open_positions_per_tf", 0) or 0)
     for i in range(n_entries):
-        tracked = filter_atis_positions(working, symbol, atis_only=atis_only)
-        open_risk = float(len(tracked)) * float(risk.risk_per_trade)
+        tracked_all = filter_atis_positions(working, symbol, atis_only=atis_only)
+        tracked_tf = (
+            filter_atis_positions(working, symbol, atis_only=atis_only, timeframe=timeframe)
+            if scope_by_tf
+            else tracked_all
+        )
+        if max_per_tf > 0 and len(tracked_tf) >= max_per_tf:
+            if placed == 0:
+                report.blocked_by_risk += 1
+            logger.info(
+                "trade_blocked",
+                symbol=symbol,
+                reason="max_open_positions_per_tf",
+                timeframe=timeframe,
+                open_tf=len(tracked_tf),
+                max_per_tf=max_per_tf,
+            )
+            break
+        open_risk = float(len(tracked_all)) * float(risk.risk_per_trade)
         ok, reason = risk.allow_new_trade(
             equity,
-            len(tracked),
+            len(tracked_all),
             planned_risk_pct=risk.risk_per_trade,
             open_risk_pct=open_risk,
         )
@@ -881,7 +1219,9 @@ def _place_from_signal(
                 "trade_blocked",
                 symbol=symbol,
                 reason=reason,
-                open_atis=len(tracked),
+                open_atis=len(tracked_all),
+                open_tf=len(tracked_tf),
+                timeframe=timeframe,
                 attempted=i + 1,
                 wanted=n_entries,
                 spread_pips=spread_pips,
@@ -894,12 +1234,76 @@ def _place_from_signal(
         if not np.isfinite(atr_value) or atr_value <= 0:
             report.errors.append(f"{symbol}:bad_atr")
             break
-        sl, tp = _sl_tp_from_atr(price, side, atr_value, sl_mult, tp_mult)
+        try:
+            sl, tp, exit_meta = resolve_sl_tp(
+                price=price,
+                side=side,
+                atr_value=atr_value,
+                confidence=float(conf),
+                featured=featured,
+                prediction_debug=prediction_debug,
+                sl_mult=sl_mult,
+                tp_mult=tp_mult,
+                cfg=cfg,
+            )
+        except ValueError as exc:
+            report.errors.append(f"{symbol}:exit_levels:{exc}")
+            logger.info(
+                "trade_blocked",
+                symbol=symbol,
+                reason=f"exit_levels:{exc}",
+                pred=pred,
+                conf=conf,
+            )
+            break
         volume = position_size_lots(equity, risk.risk_per_trade, price, sl)
+        if bool(cfg.get("confidence_sizing_enabled", True)):
+            try:
+                from atis.engines.engine4_training.promotion_v16 import confidence_position_size
+
+                atr_pct = float(atr_value) / max(float(price), 1e-9)
+                size_m = confidence_position_size(
+                    float(conf),
+                    atr_pct=atr_pct,
+                    base_size=float(cfg.get("confidence_sizing_base", 1.0)),
+                    max_size=float(cfg.get("confidence_sizing_max", 1.5)),
+                    min_size=float(cfg.get("confidence_sizing_min", 0.25)),
+                )
+                volume = float(max(0.01, round(volume * size_m, 2)))
+            except Exception as exc:
+                logger.warning("confidence_sizing_failed", error=str(exc))
         spread_txt = f"{spread_pips:.2f}" if np.isfinite(spread_pips) else "n/a"
         entry_tag = f";entry={i + 1}/{n_entries};spread_pips={spread_txt};{spread_reason}"
+        exit_tag = (
+            f";exit={exit_meta.get('method')};rr={float(exit_meta.get('reward_risk') or 0):.2f}"
+        )
+
+        # Explainable AI: which patterns support this side (before order).
+        pattern_keys: list[str] = []
+        pattern_ids: list[str] = []
+        pattern_summary = ""
+        try:
+            from atis.shared.mt5_pattern_overlay import get_overlay_service
+
+            if bool((cfg.get("pattern_overlay") or {}).get("enabled", True)):
+                explain = get_overlay_service(cfg).explain_decision(side)
+                pattern_keys = [p["key"] for p in explain.get("patterns") or []]
+                pattern_ids = [p["id"] for p in explain.get("patterns") or []]
+                pattern_summary = str(explain.get("summary") or "")
+        except Exception as exc:
+            logger.warning("pattern_explain_failed", error=str(exc))
+        pattern_reason = f";patterns={','.join(pattern_keys[:4])}" if pattern_keys else ""
 
         if dry_run:
+            link_info = _link_trade_to_patterns(
+                side=side,
+                ticket=None,
+                reason=f"paper;pred={pred};tf={timeframe};conf={conf:.3f};{pattern_summary}",
+            )
+            if link_info.get("pattern_keys"):
+                pattern_keys = list(link_info["pattern_keys"])
+                pattern_ids = list(link_info.get("pattern_ids") or pattern_ids)
+                pattern_summary = str(link_info.get("pattern_summary") or pattern_summary)
             rec = TradeRecord(
                 ticket=None,
                 symbol=symbol,
@@ -909,25 +1313,69 @@ def _place_from_signal(
                 sl=sl,
                 tp=tp,
                 confidence=conf,
-                reason=f"pred={pred};paper;tf={timeframe}{entry_tag}{reason_suffix}",
+                reason=(
+                    f"pred={pred};paper;tf={timeframe}{entry_tag}{exit_tag}"
+                    f"{reason_suffix}{pattern_reason}"
+                ),
                 ts=_utc_now().isoformat(),
                 mode="paper",
+                pattern_keys=pattern_keys,
+                pattern_ids=pattern_ids,
+                pattern_summary=pattern_summary,
             )
-            report.trades.append(asdict(rec))
+            report.trades.append({**asdict(rec), "exit_meta": exit_meta})
             report.orders_sent += 1
             placed += 1
             with trades_log.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(asdict(rec)) + "\n")
-            logger.info("paper_trade", **asdict(rec))
+                fh.write(json.dumps({**asdict(rec), "exit_meta": exit_meta}, default=str) + "\n")
+            logger.info("paper_trade", **asdict(rec), exit_meta=exit_meta)
             # Synthetic slot so subsequent scale-ins respect max_open in paper mode.
-            working.append(type("P", (), {"magic": ATIS_MAGIC, "symbol": symbol})())
+            working.append(
+                type(
+                    "P",
+                    (),
+                    {
+                        "magic": ATIS_MAGIC,
+                        "symbol": symbol,
+                        "comment": build_order_comment(timeframe),
+                    },
+                )()
+            )
+            if bool(cfg.get("shadow_tracking_enabled", True)):
+                try:
+                    from atis.engines.engine4_training.shadow_challenger import record_shadow_decision
+
+                    # Paper EV proxy until closed-trade PnL is available.
+                    pnl_proxy = float(np.sign(pred)) * max(float(conf) - 0.5, 0.0) * 0.001
+                    record_shadow_decision(
+                        get_path("models"),
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        pnl=pnl_proxy,
+                    )
+                except Exception as exc:
+                    logger.warning("shadow_record_failed", error=str(exc))
         else:
-            order_comment = build_order_comment(timeframe)
+            pat_tag = pattern_keys[0] if pattern_keys else None
+            order_comment = build_order_comment(timeframe, pattern_tag=pat_tag)
             result = send_market_order(
                 client, symbol, side, volume, sl, tp, comment=order_comment
             )
+            ticket = result.get("order") or result.get("deal")
+            link_info = _link_trade_to_patterns(
+                side=side,
+                ticket=int(ticket) if ticket is not None else None,
+                reason=(
+                    f"demo;pred={pred};tf={timeframe};retcode={result.get('retcode')};"
+                    f"{pattern_summary}"
+                ),
+            )
+            if link_info.get("pattern_keys"):
+                pattern_keys = list(link_info["pattern_keys"])
+                pattern_ids = list(link_info.get("pattern_ids") or pattern_ids)
+                pattern_summary = str(link_info.get("pattern_summary") or pattern_summary)
             rec = TradeRecord(
-                ticket=result.get("order") or result.get("deal"),
+                ticket=ticket,
                 symbol=symbol,
                 side=side,
                 volume=volume,
@@ -937,16 +1385,38 @@ def _place_from_signal(
                 confidence=conf,
                 reason=(
                     f"pred={pred};retcode={result.get('retcode')};tf={timeframe}"
-                    f"{entry_tag}{reason_suffix}"
+                    f"{entry_tag}{exit_tag}{reason_suffix}{pattern_reason}"
                 ),
                 ts=_utc_now().isoformat(),
                 mode="demo" if str(mode) != "live" else "live",
+                pattern_keys=pattern_keys,
+                pattern_ids=pattern_ids,
+                pattern_summary=pattern_summary,
             )
-            report.trades.append(asdict(rec))
+            report.trades.append({**asdict(rec), "exit_meta": exit_meta})
             report.orders_sent += 1
             placed += 1
             with trades_log.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"trade": asdict(rec), "mt5": result}, default=str) + "\n")
+                fh.write(
+                    json.dumps(
+                        {"trade": asdict(rec), "mt5": result, "exit_meta": exit_meta},
+                        default=str,
+                    )
+                    + "\n"
+                )
+            if bool(cfg.get("shadow_tracking_enabled", True)):
+                try:
+                    from atis.engines.engine4_training.shadow_challenger import record_shadow_decision
+
+                    pnl_proxy = float(np.sign(pred)) * max(float(conf) - 0.5, 0.0) * 0.001
+                    record_shadow_decision(
+                        get_path("models"),
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        pnl=pnl_proxy,
+                    )
+                except Exception as exc:
+                    logger.warning("shadow_record_failed", error=str(exc))
             logger.info(
                 "demo_order",
                 ticket=rec.ticket,
@@ -954,13 +1424,25 @@ def _place_from_signal(
                 entry=i + 1,
                 of=n_entries,
                 spread_pips=spread_pips,
+                patterns=pattern_keys,
+                exit_meta=exit_meta,
             )
             # Refresh broker positions after each fill so caps stay accurate.
             try:
                 mt5 = _mt5_module()
                 working = list(mt5.positions_get() or [])
             except Exception:
-                working.append(type("P", (), {"magic": ATIS_MAGIC, "symbol": symbol})())
+                working.append(
+                    type(
+                        "P",
+                        (),
+                        {
+                            "magic": ATIS_MAGIC,
+                            "symbol": symbol,
+                            "comment": build_order_comment(timeframe),
+                        },
+                    )()
+                )
 
         DataStateRegistry().audit(
             "engine5",
@@ -1008,6 +1490,30 @@ def run_live_once(
     exec_mode = "paper" if dry_run else "demo"
 
     report = LiveLoopReport(started_at=_utc_now().isoformat())
+    # Drift / PSI advisory → optional retrain request for scheduler/UI.
+    if bool(cfg.get("auto_retrain_request_enabled", True)):
+        try:
+            from atis.engines.engine4_training.shadow_challenger import (
+                read_retrain_advisory,
+                write_retrain_request,
+            )
+
+            adv = read_retrain_advisory(get_path("models"))
+            if adv.get("auto_retrain_recommended") or adv.get("would_trigger_now"):
+                req = write_retrain_request(
+                    get_path("models"),
+                    reason=str(adv.get("schedule_reason") or "drift_or_interval"),
+                    source="engine5_live",
+                    symbol=(symbols[0] if symbols else None),
+                )
+                report.errors.append(f"retrain_request:{req.get('reason')}")
+                logger.info(
+                    "retrain_request_written",
+                    reason=req.get("reason"),
+                    status=req.get("status"),
+                )
+        except Exception as exc:
+            logger.warning("retrain_advisory_check_failed", error=str(exc))
     risk = RiskManager()
     conf_thr = float(cfg.get("confidence_threshold", 0.60))
     sl_mult = float(cfg.get("stop_loss_atr_multiplier", 1.5))
@@ -1088,6 +1594,15 @@ def run_live_once(
                     "close": float(featured["close"].iloc[-1]),
                     "live_spread_pips": sig.get("live_spread_pips"),
                 }
+                # Real-time pattern drawings on MT5 (async; does not block orders).
+                overlay_meta = _sync_pattern_overlay(
+                    client, featured, symbol=symbol, timeframe=timeframe
+                )
+                decision["pattern_overlay"] = {
+                    k: overlay_meta[k]
+                    for k in ("enabled", "count", "keys", "error")
+                    if k in overlay_meta
+                }
                 _append_decision(decisions_log, decision)
                 # Merge once: decision and dbg both may carry live_spread_pips (and similar keys).
                 decision_fields = {k: v for k, v in decision.items() if k != "debug"}
@@ -1112,6 +1627,7 @@ def run_live_once(
                     tp_mult=tp_mult,
                     trades_log=trades_log,
                     reason_suffix=f";reason={dbg.get('reason')}",
+                    prediction_debug=dbg,
                 )
             except Exception as exc:
                 report.errors.append(f"{symbol}:{exc}")
@@ -1130,13 +1646,13 @@ def run_live_multi_tf(
     dry_run: bool = True,
     allow_ungated: bool = True,
 ) -> LiveLoopReport:
-    """Analyze all selected TFs with their trained models, fuse votes, then trade.
+    """Run selected timeframes with their trained models.
 
-    Pipeline per symbol:
-      1. For each TF: load model trained on that TF → live bars → features → prediction
-      2. Fuse all TF votes into one BUY/SELL/HOLD (before any order)
-      3. When opportunity + tight live spread: scale into multiple entries
-         (up to max_entries_per_cycle), capped by max_open_positions
+    Default (independent): each TF analyzes its own bars/model and may trade
+    on its own signal — no cross-TF fusion or veto.
+
+    Optional legacy fusion: set ``multi_tf_fusion: true`` to merge votes into
+    one decision before placing a single order.
     """
     ensure_project_dirs()
     set_global_seed()
@@ -1164,8 +1680,156 @@ def run_live_multi_tf(
     if len(tfs) == 1:
         return run_live_once(symbols, tfs[0], dry_run=dry_run, allow_ungated=allow_ungated)
 
+    independent = bool(cfg.get("multi_tf_independent", True)) and not bool(
+        cfg.get("multi_tf_fusion", False)
+    )
+    if independent:
+        return _run_live_multi_tf_independent(
+            symbols,
+            tfs,
+            dry_run=dry_run,
+            allow_ungated=allow_ungated,
+        )
+    return _run_live_multi_tf_fused(
+        symbols,
+        tfs,
+        dry_run=dry_run,
+        allow_ungated=allow_ungated,
+    )
+
+
+def _run_live_multi_tf_independent(
+    symbols: list[str],
+    tfs: list[str],
+    *,
+    dry_run: bool = True,
+    allow_ungated: bool = True,
+) -> LiveLoopReport:
+    """Each TF: own model, own bars, own decision, own order attempt."""
+    cfg = _cfg()
+    report = LiveLoopReport(started_at=_utc_now().isoformat())
+    risk = RiskManager()
+    conf_thr = float(cfg.get("confidence_threshold", 0.60))
+    sl_mult = float(cfg.get("stop_loss_atr_multiplier", 1.5))
+    tp_mult = float(cfg.get("take_profit_atr_multiplier", 2.5))
+    trades_log = PROJECT_ROOT / "logs" / "live" / "trades_log.jsonl"
+    trades_log.parent.mkdir(parents=True, exist_ok=True)
+    decisions_log = PROJECT_ROOT / "logs" / "live" / "decisions_log.jsonl"
+    exec_mode = "paper" if dry_run else "demo"
+
+    with mt5_session() as client:
+        account = client.account_summary()
+        equity = float(account.get("equity") or account.get("balance") or 0)
+        risk.update_equity(equity)
+        mt5 = _mt5_module()
+        positions = list(mt5.positions_get() or [])
+
+        for symbol in symbols:
+            report.iterations += 1
+            # No shared HTF cache across TFs — each timeframe stays isolated.
+            for tf in tfs:
+                try:
+                    sig = analyze_timeframe_signal(
+                        client,
+                        symbol,
+                        tf,
+                        allow_ungated=allow_ungated,
+                        match_timeframe_only=True,
+                        htf_cache=None,
+                    )
+                    pred = int(sig["pred"])
+                    conf = float(sig["conf"])
+                    featured = sig["featured"]
+                    dbg = dict(sig.get("debug") or {})
+                    dbg["multi_tf_mode"] = "independent"
+                    dbg["reason"] = dbg.get("reason") or "per_tf_independent"
+
+                    decision = {
+                        "ts": _utc_now().isoformat(),
+                        "symbol": symbol,
+                        "timeframe": tf,
+                        "timeframes": [tf],
+                        "pred": pred,
+                        "confidence": conf,
+                        "threshold": conf_thr,
+                        "model_type": sig.get("model_type") or "per_tf",
+                        "model_version": sig.get("model_version"),
+                        "model_timeframe": sig.get("model_timeframe", tf),
+                        "debug": dbg,
+                        "close": float(featured["close"].iloc[-1]),
+                        "live_spread_pips": sig.get("live_spread_pips"),
+                    }
+                    overlay_meta = _sync_pattern_overlay(
+                        client, featured, symbol=symbol, timeframe=tf
+                    )
+                    decision["pattern_overlay"] = {
+                        k: overlay_meta[k]
+                        for k in ("enabled", "count", "keys", "error")
+                        if k in overlay_meta
+                    }
+                    _append_decision(decisions_log, decision)
+                    logger.info(
+                        "live_tf_independent_decision",
+                        symbol=symbol,
+                        timeframe=tf,
+                        pred=pred,
+                        conf=conf,
+                        model=sig.get("model_version"),
+                        model_tf=sig.get("model_timeframe"),
+                    )
+
+                    _place_from_signal(
+                        report=report,
+                        risk=risk,
+                        client=client,
+                        symbol=symbol,
+                        timeframe=tf,
+                        pred=pred,
+                        conf=conf,
+                        featured=featured,
+                        equity=equity,
+                        positions=positions,
+                        dry_run=dry_run,
+                        mode=exec_mode,
+                        conf_thr=conf_thr,
+                        sl_mult=sl_mult,
+                        tp_mult=tp_mult,
+                        trades_log=trades_log,
+                        reason_suffix=";mode=independent",
+                        prediction_debug=dbg,
+                    )
+                    # Broker refresh only for live/demo fills; paper keeps synthetic slots.
+                    if not dry_run:
+                        try:
+                            positions[:] = list(mt5.positions_get() or [])
+                        except Exception:
+                            pass
+                except Exception as exc:
+                    report.errors.append(f"{symbol}/{tf}:{exc}")
+                    logger.warning(
+                        "mtf_independent_tf_failed",
+                        symbol=symbol,
+                        tf=tf,
+                        error=str(exc),
+                    )
+
+    report.finished_at = _utc_now().isoformat()
+    out = PROJECT_ROOT / "logs" / "live" / "live_run_report.json"
+    out.write_text(json.dumps(asdict(report), indent=2, default=str), encoding="utf-8")
+    return report
+
+
+def _run_live_multi_tf_fused(
+    symbols: list[str],
+    tfs: list[str],
+    *,
+    dry_run: bool = True,
+    allow_ungated: bool = True,
+) -> LiveLoopReport:
+    """Legacy path: analyze all TFs, fuse votes, place one order."""
     from atis.engines.engine4_training.multi_tf_decision import fuse_multi_tf_votes
 
+    cfg = _cfg()
     report = LiveLoopReport(started_at=_utc_now().isoformat())
     risk = RiskManager()
     conf_thr = float(cfg.get("confidence_threshold", 0.60))
@@ -1202,6 +1866,7 @@ def run_live_multi_tf(
                             htf_cache=htf_cache,
                         )
                         signals_by_tf[tf] = sig
+                        sig_dbg = dict(sig.get("debug") or {})
                         votes.append({
                             "tf": tf,
                             "pred": int(sig["pred"]),
@@ -1210,6 +1875,8 @@ def run_live_multi_tf(
                             "model_version": sig.get("model_version"),
                             "model_timeframe": sig.get("model_timeframe"),
                             "live_spread_pips": sig.get("live_spread_pips"),
+                            "expected_return": sig_dbg.get("expected_return"),
+                            "risk_score": sig_dbg.get("risk_score"),
                         })
                         logger.info(
                             "mtf_tf_signal",
@@ -1237,11 +1904,26 @@ def run_live_multi_tf(
                 if exec_tf in signals_by_tf:
                     featured = signals_by_tf[exec_tf]["featured"]
                 elif signals_by_tf:
-                    # Fallback: any available featured frame
                     first_key = next(iter(signals_by_tf))
                     featured = signals_by_tf[first_key]["featured"]
                     exec_tf = first_key
 
+                exit_agg = aggregate_prediction_exits(votes, pred)
+                decision_debug = {
+                    "reason": fuse_dbg.get("reason"),
+                    "multi_tf_fusion": fuse_dbg,
+                    "votes": votes,
+                    "scenario_probabilities": {
+                        "buy": fuse_dbg.get("buy_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
+                        "sell": fuse_dbg.get("sell_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
+                        "hold": fuse_dbg.get("flat_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
+                    },
+                    "attention_by_timeframe": {
+                        str(v.get("tf")): float(v.get("conf") or 0.0)
+                        for v in votes if "error" not in v
+                    },
+                    **exit_agg,
+                }
                 decision = {
                     "ts": _utc_now().isoformat(),
                     "symbol": symbol,
@@ -1251,22 +1933,18 @@ def run_live_multi_tf(
                     "confidence": conf,
                     "threshold": conf_thr,
                     "model_type": "multi_tf_fusion",
-                    "debug": {
-                        "reason": fuse_dbg.get("reason"),
-                        "multi_tf_fusion": fuse_dbg,
-                        "votes": votes,
-                        "scenario_probabilities": {
-                            "buy": fuse_dbg.get("buy_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
-                            "sell": fuse_dbg.get("sell_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
-                            "hold": fuse_dbg.get("flat_votes", 0) / max(len([v for v in votes if "error" not in v]), 1),
-                        },
-                        "attention_by_timeframe": {
-                            str(v.get("tf")): float(v.get("conf") or 0.0)
-                            for v in votes if "error" not in v
-                        },
-                    },
+                    "debug": decision_debug,
                     "close": float(featured["close"].iloc[-1]) if featured is not None else None,
                 }
+                if featured is not None:
+                    overlay_meta = _sync_pattern_overlay(
+                        client, featured, symbol=symbol, timeframe=exec_tf
+                    )
+                    decision["pattern_overlay"] = {
+                        k: overlay_meta[k]
+                        for k in ("enabled", "count", "keys", "error")
+                        if k in overlay_meta
+                    }
                 _append_decision(decisions_log, decision)
                 logger.info(
                     "live_mtf_decision",
@@ -1277,6 +1955,8 @@ def run_live_multi_tf(
                     exec_tf=exec_tf,
                     buy=fuse_dbg.get("buy_votes"),
                     sell=fuse_dbg.get("sell_votes"),
+                    expected_return=exit_agg.get("expected_return"),
+                    risk_score=exit_agg.get("risk_score"),
                 )
 
                 if featured is None:
@@ -1301,6 +1981,7 @@ def run_live_multi_tf(
                     tp_mult=tp_mult,
                     trades_log=trades_log,
                     reason_suffix=f";fusion={fuse_dbg.get('reason')}",
+                    prediction_debug=decision_debug,
                 )
             except Exception as exc:
                 report.errors.append(f"{symbol}:{exc}")

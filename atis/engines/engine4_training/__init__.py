@@ -55,7 +55,7 @@ except ImportError:  # pragma: no cover - hot-reload race on old server process
 logger = get_logger("atis.engine4")
 
 # Bumped when train/test/validation methodology changes — appears in job logs.
-PIPELINE_VERSION = "e4-v16.0-research-factory-20260731"
+PIPELINE_VERSION = "e4-v17.4-na-ql-phase-a-quality-first-self-diagnostic-20260803"
 
 # Arabic labels for gate failure keys (UI + logs). English key always kept alongside.
 GATE_FAILURE_AR: dict[str, str] = {
@@ -99,6 +99,10 @@ GATE_FAILURE_AR: dict[str, str] = {
     "crisis_holdout_weak": "أداء ضعيف على نافذة الأزمة/التحول",
     "recent_holdout_weak": "أداء ضعيف على النافذة الحديثة",
     "trade_rate_saturated": "معدل التداول ملامس للسقف (سياسة مشبعة)",
+    "regime_balanced_holdouts_weak": "فشل اتساق الحافة عبر أنظمة السوق (regime-balanced)",
+    "inflated_sharpe": "شارب مضخّم (uncapped/مسار غير واقعي مقابل صفقات)",
+    "early_folds_weak": "طيات CPCV/WF المبكرة ضعيفة (دقة/اختبار)",
+    "shap_missing": "تفسير SHAP غير متاح رغم تفعيله",
 }
 
 
@@ -117,6 +121,39 @@ def annotate_gate_failures(keys: list[str]) -> list[dict[str, str]]:
         seen.add(key)
         out.append({"key": key, "ar": gate_failure_ar(key), "en": key})
     return out
+
+
+def liquid_fold_val_sharpes(
+    fold_metrics: list[dict[str, Any]],
+    *,
+    min_val_trades: float,
+    cap_by_fold_test: bool = True,
+    test_slack: float = 2.5,
+) -> tuple[list[float], list[float]]:
+    """Return (raw_val_sharpes, optionally test-capped) for liquid folds.
+
+    Policy-tune Val Sharpe is optimistic on the same slice used to pick thresholds.
+    Capping by fold Test+slack keeps Val≫Test gates honest (M30 CPCV freeze smell).
+    """
+    raw: list[float] = []
+    capped: list[float] = []
+    slack = float(test_slack)
+    for f in fold_metrics or []:
+        n_vt = float(
+            f.get("n_val_trades", (f.get("policy") or {}).get("val_trades", 0)) or 0
+        )
+        if n_vt < float(min_val_trades):
+            continue
+        vs = float((f.get("policy") or {}).get("val_sharpe", f.get("val_sharpe", 0.0)) or 0.0)
+        raw.append(vs)
+        if cap_by_fold_test:
+            ts = float(
+                f.get("test_sharpe", (f.get("policy") or {}).get("fold_test_sharpe", vs)) or vs
+            )
+            capped.append(float(min(vs, ts + slack)))
+        else:
+            capped.append(vs)
+    return raw, capped
 
 
 def overtrading_rate_exceeds(rate: float, max_rate: float, *, tol_frac: float = 0.05) -> bool:
@@ -401,9 +438,11 @@ def _feature_relative_score(name: str) -> int:
             score -= 3
     if any(x in n for x in ("dist_", "zscore", "z_", "pct", "return", "ret_")):
         score += 3
-    # Prefer causal multi-TF context / agreement features (report: single-TF AUC≈0.5).
+    # Prefer causal multi-TF context / agreement / relation features.
     if n.startswith("htf_") or n.startswith("mtf_") or n.startswith("feat_"):
         score += 4
+    if n.startswith("feat_rel_"):
+        score += 3
     return score
 
 
@@ -522,18 +561,60 @@ def structure_primary_sides(allow_long: np.ndarray, allow_short: np.ndarray) -> 
     return out
 
 
+def effective_max_trade_rate(
+    max_trade_rate: float,
+    *,
+    quality_first: bool = True,
+    headroom_frac: float | None = None,
+    target_trade_rate: float = 0.0,
+) -> float:
+    """Truncate under the gate peg zone when quality-first is on.
+
+    Peg detection fires when fold rate ≥ max_fold_trade_rate × 0.90 on ≥80% liquid
+    folds. Filling exactly to the hard cap (cap_preds_by_trade_rate) guarantees
+    trade_rate_saturated — leave headroom so selection is edge-based.
+    """
+    rate = float(max_trade_rate or 0.0)
+    if rate <= 0 or rate >= 1.0:
+        return rate
+    if not quality_first:
+        return rate
+    hf = 0.82 if headroom_frac is None else float(headroom_frac)
+    # Always stay strictly below the 0.90 peg threshold used by fold_stability_report.
+    hf = float(np.clip(hf, 0.50, 0.88))
+    capped = max(0.01, rate * hf)
+    aim = float(target_trade_rate or 0.0)
+    if aim > 0:
+        # Prefer target band, never above headroom under the gate cap.
+        capped = min(capped, max(aim, rate * 0.70))
+    return max(0.01, capped)
+
+
+# Alias used by train loop (ops truncates; gate still judges max_fold_trade_rate).
+operational_trade_rate_cap = effective_max_trade_rate
+
+
 def cap_preds_by_trade_rate(
     preds: np.ndarray,
     confidences: np.ndarray,
     *,
     max_trade_rate: float,
+    quality_first: bool = False,
+    headroom_frac: float | None = None,
 ) -> np.ndarray:
-    """Hard cap overtrading (e.g. fold trade_rate 0.27) while keeping top confidence."""
+    """Hard cap overtrading (e.g. fold trade_rate 0.27) while keeping top confidence.
+
+    When ``quality_first`` is True, truncates below the peg threshold so folds do
+    not sit at max_fold_trade_rate (M5 fill-to-cap → trade_rate_saturated).
+    """
     out = preds.astype(float).copy()
-    if max_trade_rate <= 0 or max_trade_rate >= 1:
+    rate = effective_max_trade_rate(
+        max_trade_rate, quality_first=quality_first, headroom_frac=headroom_frac
+    )
+    if rate <= 0 or rate >= 1:
         return out
     idx = np.flatnonzero(out != 0)
-    n_max = max(1, int(round(len(out) * float(max_trade_rate))))
+    n_max = max(1, int(round(len(out) * float(rate))))
     if len(idx) <= n_max:
         return out
     order = idx[np.argsort(confidences[idx])[::-1][:n_max]]
@@ -563,10 +644,21 @@ def build_model(name: str, seed: int = 42, cfg: dict[str, Any] | None = None) ->
     if name == "logistic":
         return LogisticRegression(max_iter=800, random_state=seed, n_jobs=1, class_weight="balanced")
     if name in ("rf", "random_forest"):
+        # Prefer explicit rf_*; fall back to lgb_* so regularize_capacity knobs bite RF too.
+        regularize = bool(cfg.get("force_regularize_hp") or cfg.get("regularize_capacity"))
+        depth_default = 4 if regularize else 8
+        leaf_default = 25 if regularize else 8
+        rf_depth = int(cfg.get("rf_max_depth", cfg.get("lgb_max_depth", depth_default)) or depth_default)
+        if regularize:
+            rf_depth = min(rf_depth, int(cfg.get("rf_max_depth", 4) or 4))
+        leaf_from_lgb = max(8, int(cfg.get("lgb_min_child_samples", 80) or 80) // 4)
+        rf_leaf = int(cfg.get("rf_min_samples_leaf", leaf_from_lgb if regularize else leaf_default) or leaf_default)
+        if regularize:
+            rf_leaf = max(rf_leaf, leaf_default, leaf_from_lgb)
         return RandomForestClassifier(
-            n_estimators=int(cfg.get("rf_estimators", 250)),
-            max_depth=int(cfg.get("rf_max_depth", 8)),
-            min_samples_leaf=int(cfg.get("rf_min_samples_leaf", 8)),
+            n_estimators=int(cfg.get("rf_estimators", 180 if regularize else 250)),
+            max_depth=max(2, rf_depth),
+            min_samples_leaf=max(4, rf_leaf),
             random_state=seed,
             n_jobs=-1,
             class_weight="balanced_subsample",
@@ -1018,13 +1110,21 @@ def diagnose_fit(
     te_acc = float(test_cls.get("accuracy", 0.0) or 0.0)
     tr_sh = float(train_fin.get("sharpe", 0.0) or 0.0)
     va_sh = float(val_fin.get("sharpe", 0.0) or 0.0)
+    # When Val was honesty-capped for Val≫Test gates, Train→Val must use the pre-cap
+    # fold median — otherwise deflating Val alone invents overfitting
+    # (M30 20260803T100629: Train 12.3 vs capped Val 10.6 → false overfit_sharpe_gap).
+    va_sh_tv = float(
+        val_fin.get("sharpe_for_train_gap")
+        or val_fin.get("sharpe_median_fold")
+        or va_sh
+    )
     te_sh = float(test_fin.get("sharpe", 0.0) or 0.0)
     tr_n = float(train_fin.get("n_trades", 0.0) or 0.0)
     va_n = float(val_fin.get("n_trades", 0.0) or 0.0)
     te_n = float(test_fin.get("n_trades", 0.0) or 0.0)
     # Prefer train↔val financial gap; keep train↔val accuracy only when val_cls is real.
     acc_gap_tv = tr_acc - va_acc if va_acc > 0 else tr_acc - te_acc
-    sharpe_gap_tv = tr_sh - va_sh
+    sharpe_gap_tv = tr_sh - va_sh_tv
     sharpe_gap_vt = abs(va_sh - te_sh)
     status = "balanced"
     notes: list[str] = []
@@ -1032,7 +1132,7 @@ def diagnose_fit(
         status = "underfitting"
         notes.append("Weak train and test signal — high bias / lack of edge.")
     # Financial overfit: train much stronger than validation on trading metrics.
-    if sharpe_gap_tv > 1.5 and te_sh < max(va_sh, 0.0):
+    if sharpe_gap_tv > 1.5 and te_sh < max(va_sh_tv, 0.0):
         status = "overfitting"
         notes.append("Train financial much stronger than Validation — poor generalization.")
     # Accuracy-only overfit only when gap is extreme AND financial also diverges.
@@ -1060,6 +1160,11 @@ def diagnose_fit(
             status = "unstable_generalization"
     if te_sh > 0 and va_sh > 0 and sharpe_gap_vt < 1.25:
         notes.append("Val and Test both positive with moderate gap.")
+    if abs(float(va_sh_tv) - float(va_sh)) > 0.25:
+        notes.append(
+            f"Val honesty-capped for VT gates ({va_sh_tv:.2f}→{va_sh:.2f}); "
+            "Train→Val uses pre-cap fold median."
+        )
     auc = float(test_cls.get("roc_auc_ovr", 0.0) or 0.0)
     if auc < 0.52 and te_sh > 0:
         notes.append("Positive Sharpe with near-chance AUC — edge may be filter-driven.")
@@ -1248,6 +1353,15 @@ def write_evaluation_report(path: Path, payload: dict[str, Any]) -> None:
     )
     for n in diag.get("notes") or ["—"]:
         lines.append(f"- {n}")
+    # Self-Diagnostic Engine section (causal, bilingual)
+    try:
+        from atis.engines.engine4_training.self_diagnostic import format_diagnosis_markdown
+
+        sd = payload.get("self_diagnosis") or {}
+        if sd:
+            lines.extend(format_diagnosis_markdown(sd))
+    except Exception:
+        pass
     lines.extend(
         [
             "",
@@ -1259,6 +1373,8 @@ def write_evaluation_report(path: Path, payload: dict[str, Any]) -> None:
             "- Treat compounded total_return as illustrative only; use sum/mean trade returns for honesty.",
             "- Monitor expectancy, Sortino, DSR, and regime stability — not accuracy alone.",
             "- Use knowledge_loop.json episodes to drive continuous learning / next experiment.",
+            "- Prefer trade-level Sharpe + Deflated Sharpe; treat uncapped path Sharpe as diagnostic-only.",
+            "- Reject live promotion when trade_rate is pegged to cap or Train/Val/Test gaps explode.",
             "",
         ]
     )
@@ -1424,11 +1540,14 @@ def train_confidence_floor(
     min_floor: float = 0.60,
     target_trade_rate: float = 0.0,
     max_floor: float = 0.88,
+    max_trade_rate: float = 0.0,
+    quality_first: bool = True,
 ) -> float:
     """Fit confidence cutoff on train probs so val/test do not re-estimate the quantile.
 
-    Report 2026-07-31 showed q=0.95 + min_floor=0.65 → fold trade_rate≈0–2% starvation.
-    Align the quantile with target_trade_rate and cap the absolute floor.
+    Quality-first (e4-v17.3): aim for headroom *under* the hard trade-rate cap so
+    folds are edge-selected, not fill-to-cap (peg) → trade_rate_saturated.
+    Legacy path still avoids extreme starvation when quality_first=False.
     """
     floor = max(float(decision_threshold), float(min_floor))
     proba, _ = _model_proba(model, X_train)
@@ -1438,14 +1557,26 @@ def train_confidence_floor(
     if len(conf) < 10:
         return float(min(floor, max_floor))
     q = float(confidence_quantile) if 0.0 < float(confidence_quantile) < 1.0 else 0.88
-    # Keep roughly target_trade_rate of bars above the floor (with a small buffer).
-    if target_trade_rate and target_trade_rate > 0:
-        q_rate = float(np.clip(1.0 - max(float(target_trade_rate), 0.02) * 2.2, 0.50, 0.88))
+    rate_cap = float(max_trade_rate) if max_trade_rate and max_trade_rate > 0 else 0.0
+    aim_rate = float(target_trade_rate) if target_trade_rate and target_trade_rate > 0 else 0.0
+    if quality_first:
+        # Keep ~70% of the tighter of (target, 75% of hard cap) — leave headroom vs peg.
+        headroom_cap = rate_cap * 0.75 if rate_cap > 0 else 0.0
+        if aim_rate > 0 and headroom_cap > 0:
+            aim_rate = min(aim_rate, headroom_cap)
+        elif headroom_cap > 0:
+            aim_rate = headroom_cap
+        if aim_rate > 0:
+            # Stricter than fill-to-cap: fewer bars above floor than the hard max.
+            q_rate = float(np.clip(1.0 - max(aim_rate, 0.02) * 1.35, 0.72, 0.94))
+            q = max(q, q_rate)
+    elif aim_rate > 0:
+        # Legacy: align quantile toward target liquidity (can peg at max_fold_trade_rate).
+        q_rate = float(np.clip(1.0 - max(aim_rate, 0.02) * 2.2, 0.50, 0.88))
         q = min(q, q_rate)
     raw = float(np.quantile(conf, q))
-    # Soft cap: never sit at the absolute max when targeting liquid trade rates.
     soft_max = float(max_floor)
-    if target_trade_rate and target_trade_rate >= 0.04:
+    if not quality_first and aim_rate >= 0.04:
         soft_max = min(soft_max, max(float(max_floor), 0.72))
     return float(np.clip(max(floor, raw), 0.0, soft_max))
 
@@ -1478,6 +1609,8 @@ def tune_trade_policy(
     calibrate_fn: Callable[[np.ndarray], np.ndarray] | None = None,
     apply_sparsify: bool = False,
     primary_sides: np.ndarray | None = None,
+    quality_first: bool = True,
+    trade_rate_headroom: float | None = None,
 ) -> dict[str, float]:
     """Pick threshold/edge on a validation slice with the same stack as live eval."""
     proba, classes = _model_proba(model, X_val)
@@ -1509,7 +1642,14 @@ def tune_trade_policy(
         dtype=float,
     )
     conf = proba.max(axis=1)
-    max_rate = float(max_trade_rate) if max_trade_rate > 0 else 0.20
+    gate_max_rate = float(max_trade_rate) if max_trade_rate > 0 else 0.20
+    # Truncate below peg zone; gate still judges against gate_max_rate.
+    max_rate = effective_max_trade_rate(
+        gate_max_rate,
+        quality_first=quality_first,
+        headroom_frac=trade_rate_headroom,
+        target_trade_rate=target_trade_rate,
+    )
 
     def _score(
         thr: float,
@@ -1559,21 +1699,30 @@ def tune_trade_policy(
         )
         trades = float(stats.get("trades") or 0.0)
         trade_rate = trades / max(len(close_val), 1)
-        # Prefer expectancy-after-cost + mild Sharpe; penalize over-trading and starvation.
+        # Quality-first: win_rate + expectancy dominate; compounded return is secondary
+        # (filling the hard cap inflated Return/Sharpe while triggering saturation gates).
         expectancy = float(fin.get("expectancy", 0.0) or 0.0)
+        win_rate = float(fin.get("win_rate", 0.0) or 0.0)
         score = (
-            0.40 * float(fin["sharpe"])
-            + 1.8 * float(fin["total_return"])
-            + 12.0 * expectancy
+            0.25 * float(fin["sharpe"])
+            + 0.90 * float(fin["total_return"])
+            + 14.0 * expectancy
+            + 2.4 * (win_rate - 0.50)
+            + 0.35 * min(float(fin.get("profit_factor", 0.0) or 0.0), 2.5)
         )
         if trades < min_trades:
             score -= 3.0
         if target_trade_rate > 0 and trade_rate < target_trade_rate * 0.35:
             score -= 2.5 * (1.0 - trade_rate / max(target_trade_rate * 0.35, 1e-6))
-        soft_cap = max(0.08, float(target_trade_rate) * 1.6 if target_trade_rate > 0 else 0.08)
+        # Soft floor 0.03 (not 0.06) so low-cap TFs (M5/H1) are not pushed toward peg.
+        soft_cap = max(0.03, float(target_trade_rate) * 1.25 if target_trade_rate > 0 else 0.03)
+        soft_cap = min(soft_cap, gate_max_rate * 0.85) if gate_max_rate > 0 else soft_cap
         if trade_rate > soft_cap:
-            score -= 2.5 * (trade_rate / soft_cap)
-        if trade_rate > max_rate:
+            score -= 3.5 * (trade_rate / soft_cap)
+        # Hard anti-peg: sitting at/near max_fold_trade_rate is a reject smell.
+        if gate_max_rate > 0 and trade_rate >= gate_max_rate * 0.90:
+            score -= 5.0 * (trade_rate / max(gate_max_rate, 1e-6))
+        if trade_rate > gate_max_rate:
             score -= 4.0
         if abs(fin["max_drawdown"]) > 0.20:
             score -= 1.5
@@ -1583,6 +1732,8 @@ def tune_trade_policy(
             score -= 0.5
         if expectancy < 0:
             score -= 1.5
+        if win_rate < 0.48 and trades >= min_trades:
+            score -= 1.2
         return score, trades, fin
 
     base_floor = float(confidence_floor) if confidence_floor is not None else None
@@ -1634,9 +1785,10 @@ def tune_trade_policy(
         if regime_val is not None and (~regime_val).any():
             regime_options.append(np.ones_like(regime_val, dtype=bool))
     else:
-        grid_q = sorted({max(base_quantile, q) for q in (base_quantile, 0.90, 0.92, 0.94)})
-        grid_edge = sorted({max(base_edge, e) for e in (base_edge, 0.18, 0.20, 0.22)})
-        grid_thr = sorted({max(base_threshold, t) for t in (base_threshold, 0.55, 0.58, 0.60)})
+        # Quality-first: only tighten from baseline (never loosen when already liquid).
+        grid_q = sorted({max(base_quantile, q) for q in (base_quantile, 0.90, 0.92, 0.94, 0.95)})
+        grid_edge = sorted({max(base_edge, e) for e in (base_edge, 0.18, 0.20, 0.22, 0.24)})
+        grid_thr = sorted({max(base_threshold, t) for t in (base_threshold, 0.56, 0.58, 0.60, 0.62)})
         grid_floor = [base_floor]
         grid_cost = [float(cost_edge_multiple)]
         regime_options = [regime_val]
@@ -1890,8 +2042,8 @@ def prepare_xy(
         }]
     if bool(cfg.get("prefer_relative_features", True)):
         feature_cols = prefer_relative_features(feature_cols, keep_min=int(cfg.get("min_relative_features", 12)))
-    # Always keep multi-TF / engineered features when present (report: need HTF context).
-    boost_prefixes = ("htf_", "mtf_", "feat_")
+    # Always keep multi-TF / engineered / relation features when present.
+    boost_prefixes = ("htf_", "mtf_", "feat_", "feat_rel_")
     boosted = [c for c in select_feature_columns(work) if str(c).startswith(boost_prefixes)]
     for c in boosted:
         if c not in feature_cols and c not in {"label", "label_weight"}:
@@ -1949,12 +2101,94 @@ def train_symbol_timeframe(
     cfg = dict(_cfg())
     result = TrainResult(symbol=symbol, timeframe=timeframe, version="")
     applied_self_opt: dict[str, Any] = {}
+    # Apply single next research-factory hypothesis knobs (one change rule).
+    if bool(cfg.get("apply_research_next_hypothesis", True)):
+        try:
+            next_path = get_path("models") / "intelligence" / "next_hypothesis.json"
+            if next_path.exists():
+                next_hyp = json.loads(next_path.read_text(encoding="utf-8"))
+                knobs = dict(next_hyp.get("knobs") or {})
+                hyp_tf = str(next_hyp.get("timeframe") or "").upper().strip()
+                # Trade-policy / rate knobs without a timeframe poison every TF
+                # (M30 filled to collapsed 0.05 cap from an unscoped desaturate hyp).
+                _tf_sensitive = {
+                    "max_fold_trade_rate",
+                    "target_trade_rate",
+                    "confidence_quantile",
+                    "cost_edge_multiple",
+                    "short_edge_multiple",
+                    "min_trade_confidence",
+                    "directional_edge",
+                    "barrier_atr_multiplier",
+                    "top_features",
+                    "horizon_bars",
+                    "stable_feature_min_frac",
+                }
+                needs_tf = bool(set(knobs) & _tf_sensitive)
+                tf_ok = (hyp_tf == str(timeframe).upper()) if (hyp_tf or needs_tf) else True
+                if needs_tf and not hyp_tf:
+                    tf_ok = False
+                    if log:
+                        log(
+                            f"[{timeframe}] research_hypothesis_skipped "
+                            f"unscoped_tf_sensitive code={next_hyp.get('code')}"
+                        )
+                if knobs and tf_ok and not cfg.get("research_active_hypothesis"):
+                    cfg.update(knobs)
+                    # TF-scoped horizon/barrier knobs must land in by_tf maps (horizon_bars alone is ignored when by_tf set).
+                    if "horizon_bars" in knobs:
+                        hbt = dict(cfg.get("horizon_by_timeframe") or {})
+                        hbt[str(timeframe).upper()] = int(knobs["horizon_bars"])
+                        cfg["horizon_by_timeframe"] = hbt
+                    if "barrier_atr_multiplier" in knobs:
+                        bat = dict(cfg.get("barrier_atr_multiplier_by_tf") or {})
+                        bat[str(timeframe).upper()] = float(knobs["barrier_atr_multiplier"])
+                        cfg["barrier_atr_multiplier_by_tf"] = bat
+                    if "stable_feature_min_frac" in knobs:
+                        sff = dict(cfg.get("stable_feature_min_frac_by_tf") or {})
+                        sff[str(timeframe).upper()] = float(knobs["stable_feature_min_frac"])
+                        cfg["stable_feature_min_frac_by_tf"] = sff
+                    if "top_features" in knobs:
+                        tft = dict(cfg.get("top_features_by_tf") or {})
+                        tft[str(timeframe).upper()] = int(knobs["top_features"])
+                        cfg["top_features_by_tf"] = tft
+                    # Trade-policy / rate knobs must land in by_tf maps or H1 keeps stale caps.
+                    try:
+                        from atis.engines.engine4_training.enterprise_report import sync_tf_scoped_override
+
+                        for _k in (
+                            "max_fold_trade_rate",
+                            "target_trade_rate",
+                            "confidence_quantile",
+                            "cost_edge_multiple",
+                            "short_edge_multiple",
+                        ):
+                            if _k in knobs:
+                                sync_tf_scoped_override(cfg, _k, knobs[_k], timeframe)
+                    except Exception:
+                        pass
+                    cfg["research_active_hypothesis"] = {
+                        "code": next_hyp.get("code"),
+                        "single_change": next_hyp.get("single_change"),
+                        "ar": next_hyp.get("ar"),
+                        "timeframe": hyp_tf or str(timeframe).upper(),
+                    }
+                    if log:
+                        log(f"[{timeframe}] research_hypothesis_applied={next_hyp.get('code')} knobs={list(knobs)}")
+                elif knobs and not tf_ok and log:
+                    log(
+                        f"[{timeframe}] research_hypothesis_skipped "
+                        f"target_tf={hyp_tf} code={next_hyp.get('code')}"
+                    )
+        except Exception as exc:
+            if log:
+                log(f"[{timeframe}] research_hypothesis_apply_error={exc}")
     if bool(cfg.get("apply_self_optimize", True)):
         try:
             from atis.engines.engine4_training.enterprise_report import apply_pending_overrides
 
             kl_path = get_path("models") / symbol / timeframe / "knowledge_loop.json"
-            applied_self_opt = apply_pending_overrides(cfg, kl_path)
+            applied_self_opt = apply_pending_overrides(cfg, kl_path, timeframe=timeframe)
             if applied_self_opt and log:
                 log(f"[{timeframe}] self_optimize_applied={applied_self_opt}")
         except Exception as exc:
@@ -2110,6 +2344,18 @@ def train_symbol_timeframe(
         if timeframe in by_tf_meta:
             use_meta_labeling = bool(by_tf_meta[timeframe])
         max_fold_trade_rate = float(cfg.get("max_fold_trade_rate", 0.20))
+        by_tf_max_rate = cfg.get("max_fold_trade_rate_by_tf") or {}
+        if timeframe in by_tf_max_rate:
+            max_fold_trade_rate = float(by_tf_max_rate[timeframe])
+        quality_first_policy = bool(cfg.get("quality_first_trade_policy", True))
+        trade_rate_headroom = float(cfg.get("quality_first_cap_headroom_frac", 0.82) or 0.82)
+        # Ops cap stays under peg threshold; hard max_fold_trade_rate remains the gate.
+        ops_trade_rate = effective_max_trade_rate(
+            max_fold_trade_rate,
+            quality_first=quality_first_policy,
+            headroom_frac=trade_rate_headroom,
+            target_trade_rate=target_trade_rate if quality_first_policy else 0.0,
+        )
         regime_low_q = float(cfg.get("regime_atr_low_q", 0.20))
         regime_high_q = float(cfg.get("regime_atr_high_q", 0.90))
         embargo = horizon if use_purge else 0
@@ -2189,7 +2435,11 @@ def train_symbol_timeframe(
                     train_directional_only=train_directional_only,
                     cfg=model_cfg,
                     n_windows=int(cfg.get("stable_feature_windows", 3)),
-                    min_frac=float(cfg.get("stable_feature_min_frac", 0.6)),
+                    min_frac=float(
+                        (cfg.get("stable_feature_min_frac_by_tf") or {}).get(
+                            timeframe, cfg.get("stable_feature_min_frac", 0.6)
+                        )
+                    ),
                 )
             else:
                 w_sel = time_decay_weights(len(first_tr), half_life) * label_weights[first_tr]
@@ -2501,11 +2751,24 @@ def train_symbol_timeframe(
         try:
             from atis.engines.engine4_training.financial_hpo import resolve_zoo_vs_nested
 
+            # Merge model_cfg so nested regularize / prefer_simpler flags reach the resolver.
+            resolve_cfg = dict(cfg)
+            for _rk in (
+                "prefer_simpler_within_epsilon",
+                "force_regularize_hp",
+                "regularize_capacity",
+                "prefer_nested_on_capacity_conflict",
+                "prefer_ensemble_on_conflict",
+                "family_conflict_score_tol",
+                "nested_hp_allow_family_switch",
+            ):
+                if _rk in model_cfg:
+                    resolve_cfg[_rk] = model_cfg[_rk]
             family_resolution = resolve_zoo_vs_nested(
                 nested_meta=nested_hp_meta,
                 zoo_meta=model_zoo_meta,
                 current_model_name=model_name,
-                cfg=cfg,
+                cfg=resolve_cfg,
             )
             if family_resolution.get("conflict"):
                 model_name = str(family_resolution.get("selected_baseline") or model_name)
@@ -2589,6 +2852,8 @@ def train_symbol_timeframe(
                 min_floor=float(cfg.get("min_confidence_floor", 0.55)),
                 target_trade_rate=target_trade_rate,
                 max_floor=float(cfg.get("max_confidence_floor", 0.88)),
+                max_trade_rate=max_fold_trade_rate,
+                quality_first=quality_first_policy,
             )
 
             # Split fold window into validation (policy tuning) + held-out test.
@@ -2676,6 +2941,8 @@ def train_symbol_timeframe(
                         calibrate_fn=calibrate_fn,
                         apply_sparsify=apply_oos_sparsify,
                         primary_sides=primary_val,
+                        quality_first=quality_first_policy,
+                        trade_rate_headroom=trade_rate_headroom,
                     )
                     # Prefer floor found by starvation-aware tuner when present.
                     policy["confidence_floor"] = float(policy.get("confidence_floor", conf_floor))
@@ -2695,8 +2962,17 @@ def train_symbol_timeframe(
                         if float(policy.get("confidence_floor", floor_cap)) > floor_cap:
                             policy["confidence_floor"] = floor_cap
                             conf_floor = floor_cap
-                        if liquid_ok:
+                        # Never freeze a near-starved trade-rate policy (H1 fold-4 tragedy).
+                        fold_tr = float(policy.get("val_trades", 0.0) or 0.0) / max(len(te_val), 1)
+                        min_freeze_rate = float(cfg.get("min_policy_freeze_trade_rate", 0.04))
+                        rate_ok = fold_tr >= min_freeze_rate
+                        if liquid_ok and rate_ok:
                             frozen_policy = dict(policy)
+                        elif liquid_ok and not rate_ok and log:
+                            log(
+                                f"[{timeframe}] skip_freeze_sparse_policy "
+                                f"fold={fold_i + 1} trade_rate={fold_tr:.3f} < {min_freeze_rate}"
+                            )
                 elif frozen_policy is not None:
                     policy = dict(frozen_policy)
                     policy["confidence_floor"] = float(policy.get("confidence_floor", conf_floor))
@@ -2747,7 +3023,9 @@ def train_symbol_timeframe(
                     if apply_oos_sparsify and target_trade_rate > 0:
                         vp = sparsify_by_confidence(vp, proba_val.max(axis=1), target_trade_rate=target_trade_rate)
                     vp = cap_preds_by_trade_rate(
-                        vp, proba_val.max(axis=1), max_trade_rate=max_fold_trade_rate
+                        vp,
+                        proba_val.max(axis=1),
+                        max_trade_rate=ops_trade_rate,
                     )
                     val_preds[te_val] = vp
                     val_mask[te_val] = True
@@ -2823,7 +3101,7 @@ def train_symbol_timeframe(
                 pred = apply_trend_align(pred, allow_long[te_test], allow_short[te_test])
             if apply_oos_sparsify and target_trade_rate > 0:
                 pred = sparsify_by_confidence(pred, conf, target_trade_rate=target_trade_rate)
-            pred = cap_preds_by_trade_rate(pred, conf, max_trade_rate=max_fold_trade_rate)
+            pred = cap_preds_by_trade_rate(pred, conf, max_trade_rate=ops_trade_rate)
 
             # Train-slice score with the same frozen/calibrated policy (overfit monitor).
             proba_tr, classes_tr = _model_proba(model, X_tr_all)
@@ -2884,7 +3162,7 @@ def train_symbol_timeframe(
                 pred_tr = apply_trend_align(pred_tr, allow_long[tr], allow_short[tr])
             if apply_oos_sparsify and target_trade_rate > 0:
                 pred_tr = sparsify_by_confidence(pred_tr, conf_tr, target_trade_rate=target_trade_rate)
-            pred_tr = cap_preds_by_trade_rate(pred_tr, conf_tr, max_trade_rate=max_fold_trade_rate)
+            pred_tr = cap_preds_by_trade_rate(pred_tr, conf_tr, max_trade_rate=ops_trade_rate)
             train_preds[tr] = pred_tr
             train_raw[tr] = raw_tr
             train_mask[tr] = True
@@ -2962,6 +3240,8 @@ def train_symbol_timeframe(
                     "n_validation": int(len(te_val)),
                     "n_test": int(len(te_test)),
                     "trade_rate": float(np.mean(pred != 0)) if len(pred) else 0.0,
+                    "win_rate": float(fold_test_fin.get("win_rate", 0.0) or 0.0),
+                    "expectancy": float(fold_test_fin.get("expectancy", 0.0) or 0.0),
                     "policy": policy,
                     "confidence_floor": conf_floor,
                     "val_sharpe": float(policy.get("val_sharpe", 0.0)),
@@ -3027,6 +3307,44 @@ def train_symbol_timeframe(
             val_rets = val_rets.copy()
             val_rets[~val_mask] = 0.0
             val_fin = _fm(val_rets[val_mask])
+        if bool(cfg.get("honest_val_sharpe_from_folds", True)) and fold_metrics:
+            from atis.engines.engine4_training.data_quality_gate import min_val_trades_for_timeframe as _min_vt
+
+            min_vt_honest = float(_min_vt(timeframe, cfg))
+            cap_by_test = bool(cfg.get("honest_val_cap_by_fold_test", True))
+            test_slack = float(cfg.get("honest_val_fold_test_slack", 2.5) or 2.5)
+            liquid_fold_vs_raw, liquid_fold_vs = liquid_fold_val_sharpes(
+                fold_metrics,
+                min_val_trades=min_vt_honest,
+                cap_by_fold_test=cap_by_test,
+                test_slack=test_slack,
+            )
+            if len(liquid_fold_vs) >= 2:
+                path_sh = float(val_fin.get("sharpe", 0.0) or 0.0)
+                med_raw = float(np.median(np.asarray(liquid_fold_vs_raw, dtype=float)))
+                med_sh = float(np.median(np.asarray(liquid_fold_vs, dtype=float)))
+                val_fin = dict(val_fin)
+                val_fin["sharpe_path_optimistic"] = path_sh
+                val_fin["sharpe_median_fold"] = med_raw
+                val_fin["sharpe_median_fold_capped"] = med_sh
+                # Always retain pre-cap median for Train→Val overfit gates.
+                val_fin["sharpe_for_train_gap"] = med_raw
+                honest_sh = med_sh if (cap_by_test or path_sh > med_sh + 0.25) else path_sh
+                if path_sh > honest_sh + 0.25 or (cap_by_test and abs(med_raw - med_sh) > 0.25):
+                    val_fin["sharpe"] = honest_sh
+                    val_fin["sharpe_honesty"] = (
+                        "median_fold_val_capped_by_test" if cap_by_test else "median_fold_val"
+                    )
+                    if log:
+                        log(
+                            f"[{timeframe}] honest_val_sharpe path={path_sh:.3f} → "
+                            f"median_fold={med_raw:.3f} capped={med_sh:.3f} "
+                            f"(n_liquid={len(liquid_fold_vs)} slack={test_slack})"
+                        )
+                else:
+                    val_fin["sharpe_honesty"] = "path_ok"
+                    if not cap_by_test and path_sh <= med_sh + 0.25:
+                        val_fin["sharpe_for_train_gap"] = path_sh
         _emit_stage("val_policy", 78.0, f"اكتمل Validation · {timeframe}")
 
         # Train / Val / Test comparison
@@ -3118,9 +3436,12 @@ def train_symbol_timeframe(
             trade_level_sharpe,
         )
         from atis.engines.engine4_training.promotion_v16 import (
+            consistency_score_report,
             crisis_recent_holdout_slices,
             evaluate_holdout_slice,
             fold_stability_report,
+            inflated_sharpe_report,
+            regime_balanced_holdout_report,
         )
 
         traded_oos = rets_oos[oos_mask]
@@ -3149,7 +3470,25 @@ def train_symbol_timeframe(
         crisis_holdout = evaluate_holdout_slice(
             rets_full_for_holdout, holdout_slices["crisis"], financial_fn=_fm, name="crisis"
         )
-        fold_stability = fold_stability_report(fold_metrics, cfg=cfg)
+        # Peg detection must use the *effective* TF-resolved cap (not stale global).
+        fold_stab_cfg = dict(cfg)
+        fold_stab_cfg["max_fold_trade_rate"] = float(max_fold_trade_rate)
+        fold_stability = fold_stability_report(fold_metrics, cfg=fold_stab_cfg)
+        sharpe_inflation = inflated_sharpe_report(
+            fin,
+            cfg=cfg,
+            auc=float(cls_metrics.get("roc_auc_ovr", 0.0) or 0.0),
+        )
+        fin["sharpe_inflation"] = sharpe_inflation
+        # Prefer conservative display sharpe for downstream champion scoring hints
+        fin["sharpe_conservative"] = float(
+            min(
+                float(fin.get("sharpe", 0) or 0),
+                max(float(trade_level_metrics.get("trade_sharpe_raw", 0) or 0) * 2.0, 0.0)
+                if float(trade_level_metrics.get("n_trades", 0) or 0) >= 20
+                else float(fin.get("sharpe", 0) or 0),
+            )
+        )
         _emit_stage("test_oos", 88.0, f"اكتمل Testing OOS · {timeframe}")
 
         # Buy & hold baseline on same OOS window
@@ -3195,6 +3534,7 @@ def train_symbol_timeframe(
         from atis.engines.engine4_training.advanced_metrics import (
             deflated_sharpe_ratio,
             probability_of_backtest_overfitting,
+            pbo_hard_fail_decision,
             metrics_rationale,
         )
 
@@ -3214,6 +3554,34 @@ def train_symbol_timeframe(
             min_bars=int(cfg.get("regime_min_bars", 40)),
         )
         regime_validation["protocol_notes"] = protocol_rationale()
+        # Phase A — Consistency Score + quality compound (before gates / diagnosis)
+        from atis.engines.engine4_training.financial_hpo import quality_compound_score
+
+        consistency = consistency_score_report(
+            fold_metrics=fold_metrics,
+            regime_validation=regime_validation,
+            financial_oos=fin,
+            classification=cls_metrics,
+            cfg=cfg,
+        )
+        regime_balanced = regime_balanced_holdout_report(regime_validation, cfg=cfg)
+        quality_compound = quality_compound_score(
+            win_rate=float(fin.get("win_rate", 0) or 0),
+            f1=float(cls_metrics.get("f1_macro", 0) or 0),
+            expectancy=float(fin.get("expectancy", 0) or 0),
+            trade_rate=float(cls_metrics.get("trade_rate_filtered", 0) or 0),
+            trade_sharpe_raw=float(trade_level_metrics.get("trade_sharpe_raw", 0) or 0),
+            target_trade_rate=float(target_trade_rate),
+            max_trade_rate=float(max_fold_trade_rate),
+            inflated=bool(sharpe_inflation.get("inflated")),
+            trade_rate_pegged=bool(fold_stability.get("trade_rate_pegged")),
+        )
+        if log:
+            log(
+                f"[{timeframe}] consistency={consistency.get('score')} "
+                f"quality_compound={quality_compound.get('score')} "
+                f"regime_balanced_ok={regime_balanced.get('gate_pass')}"
+            )
         n_trials_proxy = max(
             1,
             int(cfg.get("nested_hp_trials", 8))
@@ -3227,7 +3595,11 @@ def train_symbol_timeframe(
         )
         path_is = [float(f.get("val_sharpe", 0.0) or 0.0) for f in fold_metrics]
         path_oos = [float(f.get("test_sharpe", 0.0) or 0.0) for f in fold_metrics]
-        pbo_report = probability_of_backtest_overfitting(path_is, path_oos)
+        pbo_report = probability_of_backtest_overfitting(
+            path_is,
+            path_oos,
+            material_retention_min=float(cfg.get("pbo_material_retention_min", 0.75)),
+        )
         advanced_eval = {
             "deflated_sharpe": dsr_report,
             "pbo": pbo_report,
@@ -3444,6 +3816,8 @@ def train_symbol_timeframe(
                         min_floor=float(cfg.get("min_confidence_floor", 0.52)),
                         target_trade_rate=target_trade_rate,
                         max_floor=float(cfg.get("max_confidence_floor", 0.70)),
+                        max_trade_rate=max_fold_trade_rate,
+                        quality_first=quality_first_policy,
                     ),
                 )
                 # Nested liquidity tune on chronological tail of deploy train (no holdout peek).
@@ -3495,6 +3869,8 @@ def train_symbol_timeframe(
                             if use_meta_labeling and use_trend
                             else None
                         ),
+                        quality_first=quality_first_policy,
+                        trade_rate_headroom=trade_rate_headroom,
                     )
                     nested_trades = float(nested_policy.get("val_trades", 0.0) or 0.0)
                     nested_sh = float(nested_policy.get("val_sharpe", 0.0) or 0.0)
@@ -3532,12 +3908,12 @@ def train_symbol_timeframe(
                 # Prefer top-confidence trades near target rate on deploy holdout.
                 if target_trade_rate > 0:
                     pred_h = sparsify_by_confidence(
-                        pred_h, proba_h.max(axis=1), target_trade_rate=min(target_trade_rate * 1.25, max_fold_trade_rate)
+                        pred_h, proba_h.max(axis=1), target_trade_rate=min(target_trade_rate * 1.25, ops_trade_rate)
                     )
                 pred_h = cap_preds_by_trade_rate(
                     pred_h,
                     proba_h.max(axis=1),
-                    max_trade_rate=max_fold_trade_rate,
+                    max_trade_rate=ops_trade_rate,
                 )
                 h_rets, _ = _bt(close[last_te_test], pred_h, atr_arr=atr_pct[last_te_test])
                 deploy_holdout_fin = _fm(h_rets, bootstrap=True)
@@ -3582,12 +3958,13 @@ def train_symbol_timeframe(
                         pred_rescue = sparsify_by_confidence(
                             pred_rescue,
                             proba_h.max(axis=1),
-                            target_trade_rate=min(max(target_trade_rate, 0.06), max_fold_trade_rate),
+                            # Stay under ops headroom — never fill the hard gate cap (peg smell).
+                            target_trade_rate=ops_trade_rate,
                         )
                     pred_rescue = cap_preds_by_trade_rate(
                         pred_rescue,
                         proba_h.max(axis=1),
-                        max_trade_rate=max_fold_trade_rate,
+                        max_trade_rate=ops_trade_rate,
                     )
                     rescue_rets, _ = _bt(
                         close[last_te_test], pred_rescue, atr_arr=atr_pct[last_te_test]
@@ -3636,6 +4013,9 @@ def train_symbol_timeframe(
         if timeframe in by_tf_acc_gap:
             overfit_acc_gap = float(by_tf_acc_gap[timeframe])
         overfit_sharpe_gap = float(cfg.get("max_train_val_sharpe_gap", 3.0))
+        by_tf_sharpe_gap = cfg.get("max_train_val_sharpe_gap_by_tf") or {}
+        if timeframe in by_tf_sharpe_gap:
+            overfit_sharpe_gap = float(by_tf_sharpe_gap[timeframe])
         min_deploy_h = float(cfg.get("min_deploy_holdout_sharpe", 0.0))
         min_deploy_trades = int(cfg.get("min_deploy_holdout_trades", 8))
         # Report 2026-07-31: H4 passed with 7 deploy trades when floor=3 / adaptive≈6.
@@ -3696,16 +4076,27 @@ def train_symbol_timeframe(
             # Report 04-15 H4: Val–Test gap large but Test Sharpe 2.35 — do not auto-fail strong Test.
             passed = False
             gate_failures.append("val_test_gap_weak_test")
-        # Hard gap: Val≫Test even with strong Test (report M15 gap≈3.95 was previously ignored).
+        # Hard gap: Val≫honest OOS. Prefer Deploy holdout when liquid — Test can be dragged by
+        # early CPCV paths while Deploy is the chronologically honest last-window score
+        # (M15: Val 14.6 vs Test 10.2 failed, but Deploy 12.3 → gap 2.3 should not hard-fail).
         val_test_hard = float(cfg.get("val_test_sharpe_gap_hard_max", 3.5))
-        if (
-            val_mask.any()
-            and bool(cfg.get("require_val_test_consistency", True))
-            and abs(float(val_fin.get("sharpe", 0.0)) - float(fin["sharpe"])) > val_test_hard
-            and float(val_fin.get("sharpe", 0.0)) > float(fin["sharpe"])
-        ):
-            passed = False
-            gate_failures.append("val_test_gap_hard")
+        if val_mask.any() and bool(cfg.get("require_val_test_consistency", True)):
+            val_sh = float(val_fin.get("sharpe", 0.0) or 0.0)
+            test_sh = float(fin.get("sharpe", 0.0) or 0.0)
+            deploy_sh = float(deploy_holdout_fin.get("sharpe", 0.0) or 0.0)
+            deploy_n = float(deploy_holdout_fin.get("n_trades", 0.0) or 0.0)
+            honest_oos_sh = test_sh
+            if deploy_n >= float(min_deploy_trades) and bool(
+                cfg.get("val_gap_prefer_deploy_holdout", True)
+            ):
+                # Use the stronger of Test/Deploy so a single weak early path cannot veto.
+                honest_oos_sh = max(test_sh, deploy_sh)
+            if val_sh > honest_oos_sh and (val_sh - honest_oos_sh) > val_test_hard:
+                passed = False
+                gate_failures.append("val_test_gap_hard")
+                val_fin = dict(val_fin)
+                val_fin["gap_honest_oos_sharpe"] = honest_oos_sh
+                val_fin["gap_vs_honest_oos"] = round(val_sh - honest_oos_sh, 4)
         if bool(cfg.get("fail_on_overfit", True)) and fit_diag.get("status") == "overfitting":
             # Gate on financial overfit primarily; accuracy gap alone was noisy when val_cls ≈ test folds.
             if float(fit_diag.get("sharpe_gap_train_val", 0.0)) > overfit_sharpe_gap:
@@ -3722,7 +4113,12 @@ def train_symbol_timeframe(
             sharpe_gap_tv=float(fit_diag.get("sharpe_gap_train_val", 0.0) or 0.0),
             overfit_sharpe_gap=overfit_sharpe_gap,
             train_sharpe=float(train_fin.get("sharpe", 0.0) or 0.0),
-            val_sharpe=float(val_fin.get("sharpe", 0.0) or 0.0),
+            val_sharpe=float(
+                val_fin.get("sharpe_for_train_gap")
+                or val_fin.get("sharpe_median_fold")
+                or val_fin.get("sharpe", 0.0)
+                or 0.0
+            ),
             test_sharpe=float(fin.get("sharpe", 0.0) or 0.0),
             sharpe_gap_vt=float(fit_diag.get("sharpe_gap_val_test", 0.0) or 0.0),
             n_test_trades=float(fin.get("n_trades", 0.0) or 0.0),
@@ -3850,10 +4246,20 @@ def train_symbol_timeframe(
             ) < min_exp:
                 passed = False
                 gate_failures.append("weak_expectancy")
-        if bool(cfg.get("fail_on_high_pbo", False)) and float(pbo_report.get("reliable", 0) or 0) > 0:
-            if float(pbo_report.get("pbo", 0.0) or 0.0) >= float(cfg.get("max_pbo", 0.55)):
-                passed = False
-                gate_failures.append("high_pbo")
+        pbo_gate = pbo_hard_fail_decision(pbo_report, fit_diag, cfg=cfg)
+        if pbo_report is not None:
+            pbo_report["soft_warn"] = float(1.0 if pbo_gate.get("soft_warn") else pbo_report.get("soft_warn", 0.0) or 0.0)
+            if "pbo" in (advanced_eval or {}):
+                advanced_eval["pbo"] = pbo_report
+        if pbo_gate.get("hard_fail"):
+            passed = False
+            gate_failures.append("high_pbo")
+        elif pbo_gate.get("soft_warn") and log:
+            log(
+                f"[{timeframe}] high_pbo_soft_warn pbo={float(pbo_gate.get('pbo', 0)):.2f} "
+                f"n_paths={float(pbo_gate.get('n_paths', 0)):.0f} "
+                f"reason={pbo_gate.get('reason')} (no corroborating overfit — warn only)"
+            )
         # Enterprise stress / MC / H4 no-edge / readiness gates
         if bool(cfg.get("fail_on_stress_fragile", True)) and stress_testing.get("scenarios"):
             if float(stress_testing.get("worst_sharpe", 0) or 0) < float(cfg.get("min_stress_worst_sharpe", -1.0)):
@@ -3889,6 +4295,22 @@ def train_symbol_timeframe(
         if bool(cfg.get("fail_on_trade_rate_saturated", False)) and fold_stability.get("trade_rate_pegged"):
             passed = False
             gate_failures.append("trade_rate_saturated")
+        if bool(cfg.get("fail_on_inflated_sharpe", True)) and not sharpe_inflation.get("gate_pass", True):
+            passed = False
+            gate_failures.append("inflated_sharpe")
+        if bool(cfg.get("fail_on_early_folds_weak", True)) and fold_stability.get("early_folds_weak"):
+            # Soft on tiny samples; hard when enough early folds exist
+            early_n = int(((fold_stability.get("early_fold_stats") or {}).get("n_early") or 0))
+            if early_n >= int(cfg.get("early_fold_min_count", 2)):
+                passed = False
+                gate_failures.append("early_folds_weak")
+        if (
+            bool(cfg.get("fail_on_regime_balanced_holdouts", False))
+            and regime_balanced.get("enabled")
+            and not regime_balanced.get("gate_pass", True)
+        ):
+            passed = False
+            gate_failures.append("regime_balanced_holdouts_weak")
 
         _emit_stage("gates", 94.0, f"بوابات النشر · {timeframe}")
         result.passed_gates = bool(passed)
@@ -3981,6 +4403,10 @@ def train_symbol_timeframe(
             "expectancy_vs_cost": exp_cost_meta,
             "confidence_sizing": confidence_sizing_meta,
             "fold_stability": fold_stability,
+            "sharpe_inflation": sharpe_inflation,
+            "consistency": consistency,
+            "quality_compound": quality_compound,
+            "regime_balanced_holdouts": regime_balanced,
             "recent_holdout": recent_holdout,
             "crisis_holdout": crisis_holdout,
             "model_zoo": model_zoo_meta,
@@ -4049,11 +4475,30 @@ def train_symbol_timeframe(
         metrics["awareness"] = awareness
         metrics["decision_explanations"] = decision_explanations
         from atis.engines.engine4_training.readiness import compute_live_readiness
+        from atis.engines.engine4_training.self_diagnostic import (
+            build_self_diagnosis,
+            write_diagnosis_json,
+        )
         from atis.engines.engine4_training.enterprise_report import (
             build_intelligent_critique,
             propose_config_overrides,
             write_enterprise_report,
         )
+
+        # Causal Self-Diagnostic Engine — before readiness so scores feed the scorecard
+        self_diagnosis = build_self_diagnosis(
+            metrics,
+            timeframe=timeframe,
+            passed_gates=bool(result.passed_gates),
+            cfg=cfg,
+            gate_failures=gate_failures,
+        )
+        metrics["self_diagnosis"] = self_diagnosis
+        # Prefer diagnosis knobs when self-optimize notes are empty / generic
+        if self_diagnosis.get("suggested_config_diff"):
+            metrics["suggested_config_diff"] = self_diagnosis["suggested_config_diff"]
+        if self_diagnosis.get("unified_hypothesis"):
+            metrics["unified_hypothesis"] = self_diagnosis["unified_hypothesis"]
 
         live_readiness = compute_live_readiness(
             passed_gates=bool(result.passed_gates),
@@ -4125,6 +4570,18 @@ def train_symbol_timeframe(
                     result.passed_gates = False
                     if "feature_unstable" not in gate_failures:
                         gate_failures.append("feature_unstable")
+                    metrics["gate_failures"] = gate_failures
+                    metrics["gate_failures_detail"] = annotate_gate_failures(gate_failures)
+                    metrics["passed_gates"] = False
+                shap_block = feature_explainability.get("shap") or {}
+                if (
+                    bool(cfg.get("fail_on_shap_missing", False))
+                    and bool(cfg.get("shap_enabled", True))
+                    and not shap_block.get("enabled")
+                ):
+                    result.passed_gates = False
+                    if "shap_missing" not in gate_failures:
+                        gate_failures.append("shap_missing")
                     metrics["gate_failures"] = gate_failures
                     metrics["gate_failures_detail"] = annotate_gate_failures(gate_failures)
                     metrics["passed_gates"] = False
@@ -4270,6 +4727,11 @@ def train_symbol_timeframe(
                 log(f"[{timeframe}] knowledge_loop_error={exc}")
 
         (out_dir / "metrics_report.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+        try:
+            write_diagnosis_json(out_dir / "diagnosis.json", metrics.get("self_diagnosis") or {})
+        except Exception as exc:
+            if log:
+                log(f"[{timeframe}] diagnosis_json_error={exc}")
         write_evaluation_report(out_dir / "evaluation_report.md", metrics)
         try:
             write_enterprise_report(out_dir / "enterprise_dossier.md", metrics)
@@ -4563,9 +5025,17 @@ def compact_tf_status_from_result(
             "gap_tv": diag.get("sharpe_gap_train_val"),
             "gap_vt": diag.get("sharpe_gap_val_test"),
             "acc_gap": diag.get("accuracy_gap_train_val"),
+            "consistency_score": (m.get("consistency") or {}).get("score"),
+            "quality_compound": (m.get("quality_compound") or {}).get("score"),
+            "win_rate": fin.get("win_rate"),
         },
         "folds": m.get("folds") or [],
         "fit_diagnosis": diag,
+        "consistency": m.get("consistency") or {},
+        "quality_compound": m.get("quality_compound") or {},
+        "unified_hypothesis": m.get("unified_hypothesis")
+        or (m.get("self_diagnosis") or {}).get("unified_hypothesis")
+        or {},
         "regime_validation": m.get("regime_validation") or {},
         "advanced_eval": m.get("advanced_eval") or {},
         "knowledge_loop": m.get("knowledge_loop") or {},

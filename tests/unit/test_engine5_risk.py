@@ -64,6 +64,20 @@ def test_filter_atis_positions_by_magic_and_symbol() -> None:
     assert all(p.magic == 260729 for p in atis)
 
 
+def test_filter_atis_positions_by_timeframe_comment() -> None:
+    positions = [
+        SimpleNamespace(magic=260729, symbol="XAUUSD", comment="ATIS|H1"),
+        SimpleNamespace(magic=260729, symbol="XAUUSD", comment="ATIS|M15|engulf"),
+        SimpleNamespace(magic=260729, symbol="XAUUSD", comment="ATIS|H1|tag"),
+        SimpleNamespace(magic=260729, symbol="XAUUSD", comment="OTHER|H1"),
+    ]
+    h1 = filter_atis_positions(positions, "XAUUSD", atis_only=True, timeframe="H1")
+    m15 = filter_atis_positions(positions, "XAUUSD", atis_only=True, timeframe="M15")
+    assert len(h1) == 2
+    assert len(m15) == 1
+    assert all("H1" in (p.comment or "") for p in h1)
+
+
 def test_entries_allowed_blocks_wide_spread() -> None:
     cfg = {
         "use_live_spread_filter": True,

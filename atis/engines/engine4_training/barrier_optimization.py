@@ -64,6 +64,12 @@ def sweep_barrier_params(
     hor_grid = cfg.get("barrier_sweep_horizon_grid") or [
         max(2, int(base_h + d)) for d in (-2, -1, 0, 1)
     ]
+    by_tf_atr_grid = cfg.get("barrier_sweep_atr_grid_by_tf") or {}
+    by_tf_hor_grid = cfg.get("barrier_sweep_horizon_grid_by_tf") or {}
+    if timeframe in by_tf_atr_grid:
+        atr_grid = list(by_tf_atr_grid[timeframe])
+    if timeframe in by_tf_hor_grid:
+        hor_grid = list(by_tf_hor_grid[timeframe])
     # Deduplicate
     atr_grid = sorted({float(a) for a in atr_grid if float(a) > 0.3})
     hor_grid = sorted({int(h) for h in hor_grid if int(h) >= 2})

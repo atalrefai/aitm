@@ -66,8 +66,11 @@ def test_pipeline_version_bumped_for_reliability_gates():
     assert (
         "e4-v12" in PIPELINE_VERSION
         or "e4-v13" in PIPELINE_VERSION
+        or "e4-v17" in PIPELINE_VERSION
         or "adaptive-intelligence" in PIPELINE_VERSION
         or "trading-intelligence" in PIPELINE_VERSION
+        or "quality-first" in PIPELINE_VERSION
+        or "self-diagnostic" in PIPELINE_VERSION
     )
 
 

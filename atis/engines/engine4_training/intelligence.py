@@ -11,13 +11,18 @@ import numpy as np
 
 
 ROOT_CAUSES = (
+    "TradePolicy",
+    "Model/HP",
+    "Features",
+    "Labels",
+    "DataQuality",
+    "ValidationDesign",
+    "MetricInflation",
+    "RegimeShift",
+    # Legacy aliases kept for knowledge_loop weight continuity
     "Data",
     "Labeling",
-    "Features",
-    "Model/HP",
-    "TradePolicy",
     "Liquidity/Sample",
-    "RegimeShift",
 )
 
 # Prior weights (Dirichlet-style) updated from experiment outcomes.
@@ -69,27 +74,65 @@ def update_cause_weights(
 
 
 def classify_root_cause(result: dict[str, Any]) -> tuple[str, list[str]]:
-    """Map gate failures / fit diagnosis to a primary root cause."""
+    """Map gate failures / fit diagnosis to a primary root cause.
+
+    Prefer Self-Diagnostic Engine taxonomy when available; fall back to gate map.
+    """
     metrics = result.get("metrics") or {}
+    # Prefer closed-loop diagnosis if already computed
+    diag = metrics.get("self_diagnosis") or {}
+    if diag.get("primary_root_cause") in {
+        "TradePolicy",
+        "Model/HP",
+        "Features",
+        "Labels",
+        "DataQuality",
+        "ValidationDesign",
+        "MetricInflation",
+        "RegimeShift",
+    }:
+        return str(diag["primary_root_cause"]), list(diag.get("cause_notes") or [])
+
+    try:
+        from atis.engines.engine4_training.self_diagnostic import infer_primary_root_cause
+
+        cause, notes = infer_primary_root_cause(
+            list(metrics.get("gate_failures") or []),
+            metrics,
+            timeframe=str(result.get("timeframe") or metrics.get("timeframe") or ""),
+        )
+        return cause, notes
+    except Exception:
+        pass
+
     gates = list(metrics.get("gate_failures") or [])
     fit = (metrics.get("fit_diagnosis") or {}).get("status") or ""
     dq = metrics.get("data_quality") or {}
     cls = metrics.get("classification") or {}
-    fin = metrics.get("financial_oos") or {}
     deploy = metrics.get("financial_deploy_holdout") or {}
+    fold_st = metrics.get("fold_stability") or {}
+    infl = metrics.get("sharpe_inflation") or {}
     notes: list[str] = []
 
     error = str(result.get("error") or "")
     if error.startswith("dq_") or error.startswith("insufficient_rows") or dq.get("gate_pass") is False:
         notes.append("Data-quality gate or insufficient sample.")
-        return "Data", notes
+        return "DataQuality", notes
+
+    if infl.get("inflated") or "inflated_sharpe" in gates:
+        notes.append("Inflated uncapped / path Sharpe vs trade reality.")
+        return "MetricInflation", notes
+
+    if fold_st.get("trade_rate_pegged") or "trade_rate_saturated" in gates:
+        notes.append("Trade-rate pegged to policy cap.")
+        return "TradePolicy", notes
 
     auc = float(cls.get("roc_auc_ovr", 0.5) or 0.5)
     acc = float(cls.get("accuracy", 0.5) or 0.5)
     if auc < 0.52 and acc < 0.53:
         notes.append("Near-chance discriminative power — labeling/features/signal collapse.")
         if str(result.get("timeframe", "")).upper() == "H4":
-            return "Labeling", notes
+            return "Labels", notes
         return "Features", notes
 
     liq_gates = {
@@ -103,11 +146,15 @@ def classify_root_cause(result: dict[str, Any]) -> tuple[str, list[str]]:
     }
     if any(g in liq_gates for g in gates) or float(deploy.get("n_trades", 0) or 0) < 8:
         notes.append("Starved Val/Deploy trades or inactive folds.")
-        return "Liquidity/Sample", notes
+        return "TradePolicy", notes
 
     if fit == "overfitting" or any(g.startswith("overfit") for g in gates):
         notes.append("Train≫Val financial or accuracy gap.")
         return "Model/HP", notes
+
+    if fold_st.get("early_folds_weak") or "early_folds_weak" in gates:
+        notes.append("Early CPCV/WF paths weak.")
+        return "ValidationDesign", notes
 
     if fit == "unstable_generalization" or "val_test_gap" in "".join(gates):
         notes.append("Val optimistic vs Test — policy or regime shift.")
@@ -124,7 +171,7 @@ def classify_root_cause(result: dict[str, Any]) -> tuple[str, list[str]]:
         return "TradePolicy", notes
 
     notes.append("Passed or soft issues only.")
-    return "Features", notes
+    return "ValidationDesign", notes
 
 
 def propose_next_experiment(

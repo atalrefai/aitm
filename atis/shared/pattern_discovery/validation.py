@@ -32,7 +32,70 @@ DEFAULT_GATES: dict[str, float] = {
     "soft_min_success": 0.55,
     "soft_min_evaluated": 25,
     "soft_min_expectancy": 0.0,
+    # Rankings / Engine4: auto-reject ultra-rare (e.g. Tasuki on XAU)
+    "min_occurrences_rank": 20,
 }
+
+# Per-timeframe overrides (merged on top of DEFAULT_GATES)
+TF_GATE_OVERRIDES: dict[str, dict[str, float]] = {
+    "M1": {
+        "min_evaluated": 45,
+        "soft_min_evaluated": 40,
+        "min_occurrences_rank": 40,
+        "min_success_rate": 0.53,
+        "min_profit_factor": 1.05,
+    },
+    "M5": {
+        "min_evaluated": 35,
+        "soft_min_evaluated": 32,
+        "min_occurrences_rank": 30,
+    },
+    "M15": {
+        "min_evaluated": 30,
+        "soft_min_evaluated": 28,
+        "min_occurrences_rank": 25,
+    },
+    "M30": {
+        "min_evaluated": 28,
+        "soft_min_evaluated": 26,
+        "min_occurrences_rank": 22,
+    },
+    "H1": {
+        "min_evaluated": 28,
+        "soft_min_evaluated": 25,
+        "min_occurrences_rank": 22,
+        "min_success_rate": 0.56,
+        "min_profit_factor": 1.12,
+        "soft_min_success": 0.56,
+        "min_quality_score": 0.45,
+        "soft_min_quality": 0.52,
+    },
+    "H4": {
+        "min_evaluated": 22,
+        "soft_min_evaluated": 20,
+        "min_occurrences_rank": 18,
+        "min_success_rate": 0.58,
+        "min_profit_factor": 1.15,
+        "soft_min_success": 0.57,
+        "min_quality_score": 0.48,
+        "soft_min_quality": 0.54,
+    },
+    "D1": {
+        "min_evaluated": 15,
+        "soft_min_evaluated": 12,
+        "min_occurrences_rank": 12,
+        "min_success_rate": 0.58,
+        "min_profit_factor": 1.15,
+    },
+}
+
+
+def gates_for_timeframe(timeframe: str | None = None) -> dict[str, float]:
+    """Return DEFAULT_GATES merged with TF-specific overrides."""
+    g = dict(DEFAULT_GATES)
+    if timeframe:
+        g.update(TF_GATE_OVERRIDES.get(str(timeframe).upper(), {}))
+    return g
 
 
 def success_mask(rets: np.ndarray, bias: str) -> np.ndarray:
@@ -139,9 +202,10 @@ def evaluate_validation_metrics(
     *,
     bias: str = "neutral",
     gates: dict[str, float] | None = None,
+    timeframe: str | None = None,
 ) -> dict[str, Any]:
     """Compute full validation battery and approve/reject decision."""
-    g = {**DEFAULT_GATES, **(gates or {})}
+    g = {**gates_for_timeframe(timeframe), **(gates or {})}
     rets = np.asarray(forward_returns, dtype=float)
     rets = rets[~np.isnan(rets)]
     n = int(len(rets))
@@ -153,6 +217,7 @@ def evaluate_validation_metrics(
         "metrics": {},
         "quality_score": 0.0,
         "gates": g,
+        "rare_rejected": True,
     }
     if n == 0:
         return empty
@@ -240,14 +305,21 @@ def evaluate_validation_metrics(
     if quality < g["min_quality_score"]:
         reasons.append("min_quality_score")
 
+    rare_rejected = n < int(g.get("min_occurrences_rank", g["min_evaluated"]))
+    if rare_rejected:
+        reasons.append("rare_pattern")
+
     approved = len(reasons) == 0
-    soft_promoted = approved or (
-        n >= g["soft_min_evaluated"]
-        and win_rate >= g["soft_min_success"]
-        and quality >= g["soft_min_quality"]
-        and expectancy >= g["soft_min_expectancy"]
-        and profit_factor >= 1.0
-        and mc_p <= 0.35
+    soft_promoted = (not rare_rejected) and (
+        approved
+        or (
+            n >= g["soft_min_evaluated"]
+            and win_rate >= g["soft_min_success"]
+            and quality >= g["soft_min_quality"]
+            and expectancy >= g["soft_min_expectancy"]
+            and profit_factor >= 1.0
+            and mc_p <= 0.35
+        )
     )
 
     return {
@@ -258,6 +330,7 @@ def evaluate_validation_metrics(
         "metrics": metrics,
         "quality_score": quality,
         "gates": g,
+        "rare_rejected": rare_rejected,
     }
 
 
@@ -266,6 +339,53 @@ def gate_pattern(
     *,
     bias: str = "neutral",
     gates: dict[str, float] | None = None,
+    timeframe: str | None = None,
 ) -> dict[str, Any]:
     """Alias used by discovery pipeline."""
-    return evaluate_validation_metrics(forward_returns, bias=bias, gates=gates)
+    return evaluate_validation_metrics(
+        forward_returns, bias=bias, gates=gates, timeframe=timeframe
+    )
+
+
+def confirm_htf_bias(
+    *,
+    bias: str,
+    htf_bias_values: np.ndarray | None,
+    htf_chart_scores: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Require directional agreement with higher-TF bias when HTF context exists.
+
+    Returns ``{confirmed: bool|None, mean_htf_bias, mean_chart_score}``.
+    ``confirmed is None`` means HTF context unavailable (do not block).
+    """
+    if bias not in {"bullish", "bearish"}:
+        return {"confirmed": None, "mean_htf_bias": None, "mean_chart_score": None, "skipped": True}
+
+    mean_bias = None
+    mean_chart = None
+    if htf_bias_values is not None and len(htf_bias_values):
+        vals = np.asarray(htf_bias_values, dtype=float)
+        vals = vals[~np.isnan(vals)]
+        if len(vals):
+            mean_bias = float(np.mean(vals))
+    if htf_chart_scores is not None and len(htf_chart_scores):
+        vals = np.asarray(htf_chart_scores, dtype=float)
+        vals = vals[~np.isnan(vals)]
+        if len(vals):
+            mean_chart = float(np.mean(vals))
+
+    if mean_bias is None and mean_chart is None:
+        return {"confirmed": None, "mean_htf_bias": None, "mean_chart_score": None, "skipped": True}
+
+    # Prefer pat_bias; fall back to chart_pattern_score sign
+    signal = mean_bias if mean_bias is not None else mean_chart
+    if bias == "bullish":
+        ok = signal is not None and signal >= 0
+    else:
+        ok = signal is not None and signal <= 0
+    return {
+        "confirmed": bool(ok),
+        "mean_htf_bias": mean_bias,
+        "mean_chart_score": mean_chart,
+        "skipped": False,
+    }

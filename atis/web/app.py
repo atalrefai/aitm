@@ -18,18 +18,26 @@ from pydantic import BaseModel
 from atis.config import (
     CONFIG_DIR,
     PROJECT_ROOT,
+    clear_config_caches,
     ensure_project_dirs,
     get_path,
     load_engine_config,
     load_symbols,
     load_timeframes,
+    read_secrets_env,
+    save_mt5_credentials,
 )
 from atis.engines.engine1_ingestion import run_ingestion
 from atis.engines.engine2_cleaning import run_cleaning
 from atis.engines.engine3_features import run_features
 from atis.engines.engine4_training import run_training
 from atis.engines.engine4_training.data_sources import training_source_meta
-from atis.engines.engine5_live_trading import run_live_once
+from atis.engines.engine5_live_trading import (
+    close_position,
+    close_positions_filtered,
+    list_open_positions,
+    run_live_once,
+)
 from atis.shared.data_registry import DataStateRegistry
 from atis.shared.data_json import load_timeframe_json
 from atis.shared.feature_engine.patterns import (
@@ -38,10 +46,18 @@ from atis.shared.feature_engine.patterns import (
     pattern_category_map,
     pattern_labels,
 )
-from atis.shared.mt5_client import MT5Client, ping_mt5
+from atis.shared.mt5_client import MT5Client, mt5_session, ping_mt5
 from atis.shared.pattern_discovery import run_pattern_discovery, export_pattern_json_from_kb
 from atis.shared.pattern_kb import PatternKnowledgeBase
-from atis.shared.pattern_store import SECTIONS, list_pattern_files, load_section, patterns_root
+from atis.shared.pattern_store import (
+    SECTIONS,
+    list_pattern_files,
+    load_section,
+    patterns_root,
+    rebuild_relations_from_features,
+    relations_has_content,
+    save_relations_section,
+)
 from atis.web.autotrader import autotrader
 from atis.web.jobs import jobs
 
@@ -153,6 +169,47 @@ def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _reconcile_regime_validation(regime: dict[str, Any] | None) -> dict[str, Any]:
+    """Fix legacy false-unstable labels when all regimes stay strongly profitable."""
+    if not isinstance(regime, dict) or not regime:
+        return regime or {}
+    try:
+        from atis.engines.engine4_training.validation_protocols import reconcile_regime_stability
+
+        return reconcile_regime_stability(regime)
+    except Exception:
+        return regime
+
+
+def _reconcile_tf_row_regime(row: dict[str, Any] | None) -> dict[str, Any]:
+    """Apply regime reconcile on a timeframe status/matrix row (live job or report)."""
+    if not isinstance(row, dict) or not row:
+        return row or {}
+    out = dict(row)
+    nested = out.get("metrics") if isinstance(out.get("metrics"), dict) else None
+    if nested and isinstance(nested.get("regime_validation"), dict):
+        metrics = dict(nested)
+        metrics["regime_validation"] = _reconcile_regime_validation(metrics.get("regime_validation"))
+        out["metrics"] = metrics
+    if isinstance(out.get("regime_validation"), dict):
+        out["regime_validation"] = _reconcile_regime_validation(out.get("regime_validation"))
+    return out
+
+
+def _reconcile_job_details(details: dict[str, Any] | None) -> dict[str, Any]:
+    """Live training cards read job.details.timeframes — reconcile before UI sees them."""
+    if not isinstance(details, dict) or not details:
+        return details or {}
+    out = dict(details)
+    tfs = out.get("timeframes")
+    if isinstance(tfs, dict) and tfs:
+        out["timeframes"] = {
+            str(k): _reconcile_tf_row_regime(v if isinstance(v, dict) else {})
+            for k, v in tfs.items()
+        }
+    return out
+
+
 def _read_jsonl_tail(path: Path, limit: int = 1) -> list[Any]:
     if not path.exists():
         return []
@@ -252,6 +309,15 @@ class KillSwitchRequest(BaseModel):
     reason: str = "manual"
 
 
+class ClosePositionsRequest(BaseModel):
+    """Close one ticket, or filter: all | winners | losers."""
+
+    ticket: int | None = None
+    mode: str | None = None  # all | winners | losers
+    symbol: str | None = None
+    atis_only: bool = True
+
+
 class AutoTradeRequest(BaseModel):
     mode: str = "paper"  # paper | demo
     interval_seconds: int = 60
@@ -265,6 +331,18 @@ class LiveSettingsRequest(BaseModel):
     max_entry_spread_pips: float | None = None
     tight_spread_pips: float | None = None
     max_entries_per_cycle: int | None = None
+
+
+class MT5CredentialsRequest(BaseModel):
+    login: int | str | None = None
+    password: str | None = None
+    server: str | None = None
+    path: str | None = None
+    reconnect: bool = True
+
+
+class TrainingSettingsRequest(BaseModel):
+    settings: dict[str, Any]
 
 
 class OpenPathRequest(BaseModel):
@@ -287,9 +365,67 @@ def _live_settings_payload(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     }
 
 
+def _training_settings_payload(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    train = cfg if cfg is not None else (load_engine_config().get("engine4_training") or {})
+    if not isinstance(train, dict):
+        train = {}
+    return {
+        "settings": train,
+        "count": len(train),
+        "section": "engine4_training",
+    }
+
+
+def _mt5_settings_payload() -> dict[str, Any]:
+    secrets = read_secrets_env()
+    login = secrets.get("MT5_LOGIN") or os.environ.get("MT5_LOGIN") or ""
+    server = secrets.get("MT5_SERVER") or os.environ.get("MT5_SERVER") or ""
+    path = secrets.get("MT5_PATH") or os.environ.get("MT5_PATH") or ""
+    password = secrets.get("MT5_PASSWORD") or os.environ.get("MT5_PASSWORD") or ""
+    configured = bool(login and password and server)
+    return {
+        "login": login,
+        "server": server,
+        "path": path,
+        "password_set": bool(password),
+        "password_masked": "********" if password else "",
+        "configured": configured,
+        "secrets_file": str(CONFIG_DIR / "secrets.env"),
+    }
+
+
+def _reconnect_mt5_keepalive() -> dict[str, Any]:
+    """Drop shared MT5 link and reconnect with freshly loaded credentials."""
+    global _mt5_keepalive
+    if _mt5_keepalive is not None:
+        try:
+            _mt5_keepalive.disconnect()
+        except Exception:
+            pass
+        _mt5_keepalive = None
+    client = MT5Client()
+    client.connect()
+    _mt5_keepalive = client
+    account = client.account_summary()
+    return {
+        "ok": True,
+        "login": account.get("login"),
+        "server": account.get("server"),
+        "balance": account.get("balance"),
+        "currency": account.get("currency"),
+        "trade_allowed": account.get("trade_allowed"),
+    }
+
+
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @app.get("/api/health")
@@ -460,6 +596,14 @@ def patterns(limit: int = 500, lookback: int = 5000, timeframe: str | None = Non
         "ohlc": [],
         "markers": [],
         "empty": True,
+        "relations": {
+            "summary": "لا علاقات بعد — أعد بناء الشبكة",
+            "edges": [],
+            "nodes": [],
+            "sequences": [],
+            "counts": {},
+            "empty": True,
+        },
     }
     if not json_path.exists() and not path.exists():
         return empty_payload
@@ -602,6 +746,39 @@ def patterns(limit: int = 500, lookback: int = 5000, timeframe: str | None = Non
     rel_sec = _sec("relations")
     val_sec = _sec("validation_report")
 
+    # Lazy rebuild when relations.json is an empty shell (common after resume bug)
+    if not relations_has_content(rel_sec):
+        try:
+            from atis.shared.pattern_discovery.relations import (
+                build_pattern_relations,
+                pattern_relation_columns,
+            )
+
+            rebuilt = build_pattern_relations(
+                df, pattern_relation_columns(df), labels=labels
+            )
+            if relations_has_content(rebuilt):
+                save_relations_section(
+                    symbol=symbol,
+                    timeframe=tf,
+                    relations=rebuilt,
+                    bars_scanned=int(len(df)),
+                )
+                rel_sec = {**rebuilt, "rebuilt": True}
+            else:
+                rel_sec = rebuilt or rel_sec
+        except Exception:
+            pass
+
+    counts_rel = rel_sec.get("counts") or {}
+    if not counts_rel and rel_sec.get("edges"):
+        edges_all = rel_sec.get("edges") or []
+        counts_rel = {
+            "co_occurrence": sum(1 for e in edges_all if e.get("relation") == "co_occurrence"),
+            "precedes": sum(1 for e in edges_all if e.get("relation") == "precedes"),
+            "cancels": sum(1 for e in edges_all if e.get("relation") == "cancels"),
+        }
+
     return {
         "symbol": symbol,
         "timeframe": tf,
@@ -634,9 +811,16 @@ def patterns(limit: int = 500, lookback: int = 5000, timeframe: str | None = Non
             "engine4_recommended": (rank_sec.get("engine4_recommended") or [])[:15],
         },
         "relations": {
-            "summary": rel_sec.get("summary"),
-            "edges": (rel_sec.get("edges") or [])[:25],
-            "nodes": len(rel_sec.get("nodes") or []),
+            "summary": rel_sec.get("summary") or "لا علاقات بعد — أعد بناء الشبكة",
+            "edges": (rel_sec.get("edges") or [])[:60],
+            "nodes": (rel_sec.get("nodes") or [])[:40],
+            "sequences": (rel_sec.get("sequences") or [])[:20],
+            "counts": counts_rel,
+            "bars": rel_sec.get("bars") or rel_sec.get("bars_scanned"),
+            "lag_max": rel_sec.get("lag_max"),
+            "active_patterns": rel_sec.get("active_patterns"),
+            "rebuilt": bool(rel_sec.get("rebuilt")),
+            "empty": not relations_has_content(rel_sec),
         },
         "validation_report": {
             "count": val_sec.get("count") or len(val_sec.get("items") or []),
@@ -652,6 +836,58 @@ def patterns_knowledge(timeframe: str | None = None) -> dict[str, Any]:
     tf = timeframe or None
     kb = PatternKnowledgeBase()
     return kb.summary(symbol, tf)
+
+
+@app.post("/api/patterns/relations/rebuild")
+def patterns_relations_rebuild(req: RunRequest) -> dict[str, Any]:
+    """Rebuild pattern relation graph from features for one or more timeframes."""
+    symbol, primary_tf = _primary()
+    tfs = [str(t).upper() for t in (req.timeframes or []) if t]
+    if not tfs:
+        tfs = [primary_tf]
+    results: dict[str, Any] = {}
+    for tf in tfs:
+        graph = rebuild_relations_from_features(symbol, tf, lookback=None)
+        results[tf] = {
+            "edges": len(graph.get("edges") or []),
+            "nodes": len(graph.get("nodes") or []),
+            "sequences": len(graph.get("sequences") or []),
+            "summary": graph.get("summary"),
+            "empty": not relations_has_content(graph),
+        }
+    return {"symbol": symbol, "timeframes": results}
+
+
+@app.get("/api/patterns/overlay")
+def patterns_overlay(timeframe: str | None = None, limit: int = 100) -> dict[str, Any]:
+    """Live MT5 overlay snapshot + recent pattern history (Explainable AI)."""
+    from atis.shared.mt5_pattern_overlay.bridge import local_overlay_dir
+    from atis.shared.mt5_pattern_overlay.history import read_history
+    from atis.shared.mt5_pattern_overlay.service import get_overlay_service
+
+    symbol, primary_tf = _primary()
+    tf = (timeframe or primary_tf or "H1").upper()
+    state_path = local_overlay_dir() / "overlay_state.json"
+    named = local_overlay_dir() / f"overlay_{symbol}_{tf}.json"
+    payload: dict[str, Any] = {}
+    for candidate in (named, state_path):
+        if candidate.exists():
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+                break
+            except Exception:
+                payload = {}
+    svc = get_overlay_service(load_engine_config().get("engine5_live", {}))
+    active = [p.to_dict() for p in svc.active_overlays()]
+    return {
+        "symbol": symbol,
+        "timeframe": tf,
+        "state_file": str(state_path),
+        "snapshot": payload,
+        "active": active,
+        "history": read_history(symbol=symbol, timeframe=tf, limit=limit),
+        "legend": payload.get("legend") or [],
+    }
 
 
 @app.get("/api/patterns/files")
@@ -903,7 +1139,9 @@ def training_details(timeframe: str | None = None) -> dict[str, Any]:
                 "profit_factor": fin.get("profit_factor"),
                 "validation_mode": (item.get("metrics") or {}).get("validation_mode")
                 or ((item.get("metrics") or {}).get("validation") or {}).get("validation_mode"),
-                "regime_validation": (item.get("metrics") or {}).get("regime_validation") or {},
+                "regime_validation": _reconcile_regime_validation(
+                    (item.get("metrics") or {}).get("regime_validation") or {}
+                ),
                 "advanced_eval": (item.get("metrics") or {}).get("advanced_eval") or {},
                 "knowledge_loop": (item.get("metrics") or {}).get("knowledge_loop") or {},
                 "live_readiness": (item.get("metrics") or {}).get("live_readiness") or {},
@@ -1011,7 +1249,9 @@ def training_details(timeframe: str | None = None) -> dict[str, Any]:
                 "validation_mode": metrics.get("validation_mode")
                 or st.get("validation_mode")
                 or (metrics.get("validation") or {}).get("validation_mode"),
-                "regime_validation": metrics.get("regime_validation") or st.get("regime_validation") or {},
+                "regime_validation": _reconcile_regime_validation(
+                    metrics.get("regime_validation") or st.get("regime_validation") or {}
+                ),
                 "advanced_eval": metrics.get("advanced_eval") or st.get("advanced_eval") or {},
                 "knowledge_loop": metrics.get("knowledge_loop") or st.get("knowledge_loop") or {},
                 "live_readiness": metrics.get("live_readiness") or st.get("live_readiness") or {},
@@ -1222,6 +1462,68 @@ def trades(limit: int = 100) -> dict[str, Any]:
     return {"trades": rows, "count": len(rows)}
 
 
+@app.get("/api/positions")
+def positions(symbol: str | None = None, atis_only: bool = True) -> dict[str, Any]:
+    """Live open MT5 positions (ATIS magic by default)."""
+    sym = symbol or _primary()[0]
+    try:
+        with mt5_session() as client:
+            rows = list_open_positions(client, sym, atis_only=atis_only)
+    except Exception as exc:
+        raise HTTPException(503, f"تعذر قراءة الصفقات المفتوحة: {exc}") from exc
+    winners = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) > 0)
+    losers = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) < 0)
+    total_pnl = sum(float(p.get("net_profit", 0) or 0) for p in rows)
+    return {
+        "positions": rows,
+        "count": len(rows),
+        "winners": winners,
+        "losers": losers,
+        "total_pnl": total_pnl,
+        "symbol": sym,
+        "atis_only": atis_only,
+    }
+
+
+@app.post("/api/positions/close")
+def positions_close(req: ClosePositionsRequest) -> dict[str, Any]:
+    """Close one open position by ticket, or bulk close by mode."""
+    sym = req.symbol or _primary()[0]
+    mode = (req.mode or "").strip().lower() or None
+    if req.ticket is None and mode is None:
+        raise HTTPException(400, "حدّد ticket أو mode (all|winners|losers)")
+    if req.ticket is not None and mode is not None:
+        raise HTTPException(400, "استخدم إما ticket أو mode وليس الاثنين معاً")
+    try:
+        with mt5_session() as client:
+            if req.ticket is not None:
+                result = close_position(client, int(req.ticket))
+                if not result.get("ok"):
+                    raise HTTPException(
+                        400,
+                        f"فشل إغلاق الصفقة #{req.ticket}: retcode={result.get('retcode')} {result.get('comment')}",
+                    )
+                return {"ok": True, "closed_count": 1, "closed": [result], "failed": [], "mode": "ticket"}
+            assert mode is not None
+            if mode not in {"all", "winners", "losers"}:
+                raise HTTPException(400, "mode يجب أن يكون all أو winners أو losers")
+            result = close_positions_filtered(
+                client,
+                mode=mode,
+                symbol=sym,
+                atis_only=bool(req.atis_only),
+            )
+            if result["matched"] and result["failed_count"] and not result["closed_count"]:
+                raise HTTPException(400, f"فشل إغلاق الصفقات ({mode})")
+            return result
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(503, f"تعذر إغلاق الصفقات: {exc}") from exc
+
+
 @app.get("/api/decision/latest")
 def latest_decision() -> dict[str, Any]:
     path = PROJECT_ROOT / "logs" / "live" / "decisions_log.jsonl"
@@ -1252,7 +1554,13 @@ def ohlc(limit: int = 200, layer: str = "features") -> dict[str, Any]:
 
 @app.get("/api/jobs")
 def list_jobs() -> dict[str, Any]:
-    return {"jobs": [j.to_dict() for j in jobs.list()]}
+    rows = []
+    for j in jobs.list():
+        d = j.to_dict()
+        if isinstance(d.get("details"), dict):
+            d["details"] = _reconcile_job_details(d.get("details"))
+        rows.append(d)
+    return {"jobs": rows}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -1260,7 +1568,10 @@ def get_job(job_id: str) -> dict[str, Any]:
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return job.to_dict()
+    d = job.to_dict()
+    if isinstance(d.get("details"), dict):
+        d["details"] = _reconcile_job_details(d.get("details"))
+    return d
 
 
 @app.post("/api/jobs/{job_id}/cancel")
@@ -1687,8 +1998,121 @@ def update_live_settings(req: LiveSettingsRequest) -> dict[str, Any]:
         live["tight_spread_pips"] = mx
 
     cfg_path.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    load_engine_config.cache_clear()
+    clear_config_caches()
     return _live_settings_payload(live)
+
+
+@app.get("/api/settings/mt5")
+def get_mt5_settings() -> dict[str, Any]:
+    payload = _mt5_settings_payload()
+    status = _mt5_status(auto_reconnect=False)
+    payload["connection"] = status
+    return payload
+
+
+@app.post("/api/settings/mt5")
+def update_mt5_settings(req: MT5CredentialsRequest) -> dict[str, Any]:
+    current = _mt5_settings_payload()
+    login = req.login if req.login is not None and str(req.login).strip() else current.get("login")
+    server = req.server if req.server is not None and str(req.server).strip() else current.get("server")
+    if not login:
+        raise HTTPException(400, "رقم الحساب (Login) مطلوب")
+    if not server:
+        raise HTTPException(400, "اسم السيرفر مطلوب")
+
+    password = req.password
+    keep_pwd = password is None or str(password).strip() == "" or str(password).strip() in {"••••••••", "********"}
+    if keep_pwd and not current.get("password_set"):
+        raise HTTPException(400, "كلمة المرور مطلوبة")
+
+    try:
+        save_mt5_credentials(
+            login=login,
+            password=None if keep_pwd else str(password),
+            server=str(server),
+            path=req.path,
+            keep_existing_password=keep_pwd,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر حفظ بيانات MT5: {exc}") from exc
+
+    connection: dict[str, Any] | None = None
+    connect_error: str | None = None
+    if req.reconnect:
+        try:
+            connection = _reconnect_mt5_keepalive()
+        except Exception as exc:
+            connect_error = str(exc)
+            connection = {"ok": False, "error": connect_error}
+
+    payload = _mt5_settings_payload()
+    payload["saved"] = True
+    payload["connection"] = connection or _mt5_status(auto_reconnect=False)
+    if connect_error:
+        payload["connect_error"] = connect_error
+    return payload
+
+
+@app.post("/api/settings/mt5/test")
+def test_mt5_settings(req: MT5CredentialsRequest) -> dict[str, Any]:
+    """Verify MT5 login using form values (saves first if credentials provided)."""
+    current = _mt5_settings_payload()
+    login = req.login if req.login is not None and str(req.login).strip() else current.get("login")
+    server = req.server if req.server is not None and str(req.server).strip() else current.get("server")
+    password = req.password
+    keep_pwd = password is None or str(password).strip() == "" or str(password).strip() in {"••••••••", "********"}
+
+    if not login or not server:
+        raise HTTPException(400, "رقم الحساب والسيرفر مطلوبان للتحقق")
+    if keep_pwd and not current.get("password_set"):
+        raise HTTPException(400, "أدخل كلمة المرور أولاً")
+
+    # Persist then reconnect so the shared keepalive matches the verified account.
+    try:
+        save_mt5_credentials(
+            login=login,
+            password=None if keep_pwd else str(password),
+            server=str(server),
+            path=req.path,
+            keep_existing_password=keep_pwd,
+        )
+        connection = _reconnect_mt5_keepalive()
+        payload = _mt5_settings_payload()
+        payload["saved"] = True
+        payload["connection"] = connection
+        payload["ok"] = True
+        return payload
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return {
+            **_mt5_settings_payload(),
+            "ok": False,
+            "saved": True,
+            "connection": {"ok": False, "error": str(exc)},
+            "error": str(exc),
+        }
+
+
+@app.get("/api/settings/training")
+def get_training_settings() -> dict[str, Any]:
+    return _training_settings_payload()
+
+
+@app.post("/api/settings/training")
+def update_training_settings(req: TrainingSettingsRequest) -> dict[str, Any]:
+    if not isinstance(req.settings, dict) or not req.settings:
+        raise HTTPException(400, "settings must be a non-empty object")
+
+    cfg_path = CONFIG_DIR / "engine_config.yaml"
+    raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    # Full replace of engine4_training with the snapshot from the settings UI.
+    raw["engine4_training"] = dict(req.settings)
+    cfg_path.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    clear_config_caches()
+    return _training_settings_payload(raw["engine4_training"])
 
 
 @app.post("/api/kill-switch")

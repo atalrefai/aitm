@@ -29,10 +29,10 @@ PATTERN_CATALOG: dict[str, dict[str, str]] = {
     "pat_rickshaw_man": {"name": "Rickshaw Man", "category": "candle", "bias": "neutral", "conditions": "long-legged doji mid-range"},
     "pat_marubozu_bull": {"name": "Bullish Marubozu", "category": "candle", "bias": "bullish", "conditions": "bull & body_pct>0.9"},
     "pat_marubozu_bear": {"name": "Bearish Marubozu", "category": "candle", "bias": "bearish", "conditions": "bear & body_pct>0.9"},
-    "pat_hammer": {"name": "Hammer", "category": "candle", "bias": "bullish", "conditions": "lower>2*body & short upper"},
-    "pat_inverted_hammer": {"name": "Inverted Hammer", "category": "candle", "bias": "bullish", "conditions": "upper>2*body & short lower"},
-    "pat_hanging_man": {"name": "Hanging Man", "category": "candle", "bias": "bearish", "conditions": "hammer shape on bear close"},
-    "pat_shooting_star": {"name": "Shooting Star", "category": "candle", "bias": "bearish", "conditions": "long upper wick bear close"},
+    "pat_hammer": {"name": "Hammer", "category": "candle", "bias": "bullish", "conditions": "lower>2*body & short upper & prior downtrend (close<EMA20)"},
+    "pat_inverted_hammer": {"name": "Inverted Hammer", "category": "candle", "bias": "bullish", "conditions": "upper>2*body & short lower & prior downtrend"},
+    "pat_hanging_man": {"name": "Hanging Man", "category": "candle", "bias": "bearish", "conditions": "hammer shape & prior uptrend (close>EMA20)"},
+    "pat_shooting_star": {"name": "Shooting Star", "category": "candle", "bias": "bearish", "conditions": "long upper wick & prior uptrend"},
     "pat_belt_hold_bull": {"name": "Bullish Belt Hold", "category": "candle", "bias": "bullish", "conditions": "opens near low, closes strong up"},
     "pat_belt_hold_bear": {"name": "Bearish Belt Hold", "category": "candle", "bias": "bearish", "conditions": "opens near high, closes strong down"},
     "pat_inside_bar": {"name": "Inside Bar", "category": "candle", "bias": "neutral", "conditions": "range inside prior bar"},
@@ -48,14 +48,14 @@ PATTERN_CATALOG: dict[str, dict[str, str]] = {
     "pat_dark_cloud": {"name": "Dark Cloud Cover", "category": "candle", "bias": "bearish", "conditions": "bear closes >50% into prior bull"},
     "pat_tweezer_bottom": {"name": "Tweezer Bottom", "category": "candle", "bias": "bullish", "conditions": "matching lows after decline"},
     "pat_tweezer_top": {"name": "Tweezer Top", "category": "candle", "bias": "bearish", "conditions": "matching highs after rally"},
-    "pat_meeting_bull": {"name": "Bullish Meeting Lines", "category": "candle", "bias": "bullish", "conditions": "bear then bull close near equal"},
-    "pat_meeting_bear": {"name": "Bearish Meeting Lines", "category": "candle", "bias": "bearish", "conditions": "bull then bear close near equal"},
+    "pat_meeting_bull": {"name": "Bullish Meeting Lines", "category": "candle", "bias": "bullish", "conditions": "bear then bull close near equal; moderate bodies (quiet)"},
+    "pat_meeting_bear": {"name": "Bearish Meeting Lines", "category": "candle", "bias": "bearish", "conditions": "bull then bear close near equal; moderate bodies (quiet)"},
     "pat_matching_low": {"name": "Matching Low", "category": "candle", "bias": "bullish", "conditions": "two bear candles same close"},
     "pat_matching_high": {"name": "Matching High", "category": "candle", "bias": "bearish", "conditions": "two bull candles same close"},
     "pat_kicking_bull": {"name": "Bullish Kicking", "category": "candle", "bias": "bullish", "conditions": "bear marubozu → gap-up bull marubozu"},
     "pat_kicking_bear": {"name": "Bearish Kicking", "category": "candle", "bias": "bearish", "conditions": "bull marubozu → gap-down bear marubozu"},
-    "pat_counterattack_bull": {"name": "Bullish Counterattack", "category": "candle", "bias": "bullish", "conditions": "bear then bull close equal"},
-    "pat_counterattack_bear": {"name": "Bearish Counterattack", "category": "candle", "bias": "bearish", "conditions": "bull then bear close equal"},
+    "pat_counterattack_bull": {"name": "Bullish Counterattack", "category": "candle", "bias": "bullish", "conditions": "strong bear then gap-down open (>0.08%) + strong bull close equal"},
+    "pat_counterattack_bear": {"name": "Bearish Counterattack", "category": "candle", "bias": "bearish", "conditions": "strong bull then gap-up open (>0.08%) + strong bear close equal"},
     "pat_separating_bull": {"name": "Bullish Separating Lines", "category": "candle", "bias": "bullish", "conditions": "bear then bull open=prior open"},
     "pat_separating_bear": {"name": "Bearish Separating Lines", "category": "candle", "bias": "bearish", "conditions": "bull then bear open=prior open"},
     "pat_thrusting": {"name": "Thrusting", "category": "candle", "bias": "bearish", "conditions": "bull closes into prior bear <50%"},
@@ -264,6 +264,13 @@ COMPOUND_TEMPLATES: list[tuple[str, str, str, str]] = [
 ]
 
 
+# Explicit aliases kept for Engine3/Engine4 column compatibility (not duplicate detectors).
+PATTERN_ALIASES: dict[str, str] = {
+    # Historical: counterattack previously mirrored meeting; keys remain independent
+    # after rule split — aliases reserved for future merges.
+}
+
+
 def pattern_labels() -> dict[str, str]:
     labels = {k: v["name"] for k, v in PATTERN_CATALOG.items()}
     for key, name, _, _ in COMPOUND_TEMPLATES:
@@ -361,12 +368,17 @@ def candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
     ).astype(int)
     out["pat_marubozu_bull"] = (bull & (body_pct > 0.9)).astype(int)
     out["pat_marubozu_bear"] = (bear & (body_pct > 0.9)).astype(int)
-    out["pat_hammer"] = ((lower > 2 * body) & (upper < body * 0.5) & (body_pct < 0.35)).astype(int)
-    out["pat_inverted_hammer"] = ((upper > 2 * body) & (lower < body * 0.5) & (body_pct < 0.35)).astype(int)
-    out["pat_hanging_man"] = ((lower > 2 * body) & (upper < body * 0.5) & bear).astype(int)
-    out["pat_shooting_star"] = (
-        (upper > 2 * body) & (lower < body * 0.5) & (body_pct < 0.35) & bear
-    ).astype(int)
+
+    # Causal trend context: prior bar vs EMA20 (no look-ahead)
+    ema20 = c.ewm(span=20, adjust=False, min_periods=10).mean()
+    prior_down = c.shift(1) < ema20.shift(1)
+    prior_up = c.shift(1) > ema20.shift(1)
+    hammer_shape = (lower > 2 * body) & (upper < body * 0.5) & (body_pct < 0.35)
+    inv_hammer_shape = (upper > 2 * body) & (lower < body * 0.5) & (body_pct < 0.35)
+    out["pat_hammer"] = (hammer_shape & prior_down).astype(int)
+    out["pat_inverted_hammer"] = (inv_hammer_shape & prior_down).astype(int)
+    out["pat_hanging_man"] = (hammer_shape & prior_up).astype(int)
+    out["pat_shooting_star"] = (inv_hammer_shape & prior_up).astype(int)
     out["pat_belt_hold_bull"] = (bull & (lower / rng < 0.05) & (body_pct > 0.7)).astype(int)
     out["pat_belt_hold_bear"] = (bear & (upper / rng < 0.05) & (body_pct > 0.7)).astype(int)
     out["pat_inside_bar"] = ((h <= h.shift(1)) & (l >= l.shift(1))).astype(int)
@@ -387,8 +399,17 @@ def candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
     out["pat_tweezer_bottom"] = ((pc < po) & bull & ((l - l.shift(1)).abs() / c < 0.0008)).astype(int)
     out["pat_tweezer_top"] = ((pc > po) & bear & ((h - h.shift(1)).abs() / c < 0.0008)).astype(int)
     close_eq = (c - pc).abs() / c < 0.0006
-    out["pat_meeting_bull"] = ((pc < po) & bull & close_eq).astype(int)
-    out["pat_meeting_bear"] = ((pc > po) & bear & close_eq).astype(int)
+    prior_body_pct = pb / rng.shift(1).replace(0, np.nan)
+    # Meeting lines: quiet — moderate bodies, equal closes, no aggressive gap
+    meeting_moderate = (
+        (body_pct > 0.12)
+        & (body_pct < 0.55)
+        & (prior_body_pct > 0.12)
+        & (prior_body_pct < 0.55)
+    )
+    quiet_open = (o - pc).abs() / c < 0.0012  # open near prior close (no meaningful gap)
+    out["pat_meeting_bull"] = ((pc < po) & bull & close_eq & meeting_moderate & quiet_open).astype(int)
+    out["pat_meeting_bear"] = ((pc > po) & bear & close_eq & meeting_moderate & quiet_open).astype(int)
     out["pat_matching_low"] = ((pc < po) & bear & close_eq).astype(int)
     out["pat_matching_high"] = ((pc > po) & bull & close_eq).astype(int)
     gap_up = o > h.shift(1)
@@ -399,8 +420,17 @@ def candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
     out["pat_kicking_bear"] = (
         (out["pat_marubozu_bull"].shift(1) == 1) & gap_dn & (out["pat_marubozu_bear"] == 1)
     ).astype(int)
-    out["pat_counterattack_bull"] = ((pc < po) & bull & close_eq).astype(int)
-    out["pat_counterattack_bear"] = ((pc > po) & bear & close_eq).astype(int)
+    # Counterattack: strong bodies + meaningful gap against prior direction + equal closes
+    # (mutually exclusive with meeting's quiet_open)
+    strong_bodies = (body > avg_body * 0.85) & (pb > avg_body.shift(1) * 0.85)
+    slight_gap_dn = (pc - o) / c > 0.0008  # opens meaningfully below prior close
+    slight_gap_up = (o - pc) / c > 0.0008
+    out["pat_counterattack_bull"] = (
+        (pc < po) & bull & close_eq & strong_bodies & slight_gap_dn
+    ).astype(int)
+    out["pat_counterattack_bear"] = (
+        (pc > po) & bear & close_eq & strong_bodies & slight_gap_up
+    ).astype(int)
     open_eq = (o - po).abs() / c < 0.0006
     out["pat_separating_bull"] = ((pc < po) & bull & open_eq).astype(int)
     out["pat_separating_bear"] = ((pc > po) & bear & open_eq).astype(int)
@@ -708,7 +738,12 @@ def swing_support_resistance(df: pd.DataFrame, left: int = 3, right: int = 3) ->
     return out
 
 
-def structural_patterns(df: pd.DataFrame, left: int = 3, right: int = 3) -> pd.DataFrame:
+def structural_patterns(
+    df: pd.DataFrame,
+    left: int = 3,
+    right: int = 3,
+    score_weights: dict[str, float] | None = None,
+) -> pd.DataFrame:
     n = len(df)
     high, low, close = df["high"].values, df["low"].values, df["close"].values
     sh, sl, sh_i, sl_i = _causal_swings(df["high"], df["low"], left, right)
@@ -971,45 +1006,105 @@ def structural_patterns(df: pd.DataFrame, left: int = 3, right: int = 3) -> pd.D
             _mark_harmonic_patterns(out, i, pivots, close[i])
             _mark_elliott_wolfe(out, i, pivots, close[i], high[i], low[i])
 
-        score = (
-            out["pat_double_bottom"][i]
-            + out["pat_triple_bottom"][i]
-            + out["pat_inv_head_shoulders"][i]
-            + out["pat_flag_bull"][i]
-            + out["pat_breakout_up"][i]
-            + out["pat_bos_up"][i]
-            + out["pat_choch_bull"][i]
-            + out["pat_wedge_falling"][i]
-            + out["pat_liquidity_sweep_low"][i]
-            + out["pat_triangle_asc"][i]
-            + out["pat_cup_handle"][i]
-            + out["pat_pennant_bull"][i]
-            + out["pat_rectangle_bull"][i]
-            + out["pat_compression_breakout_up"][i]
-            + out["pat_harmonic_gartley_bull"][i]
-            + out["pat_elliott_impulse_bull"][i]
-            + out["pat_wolfe_bull"][i]
-            - out["pat_double_top"][i]
-            - out["pat_triple_top"][i]
-            - out["pat_head_shoulders"][i]
-            - out["pat_flag_bear"][i]
-            - out["pat_breakout_down"][i]
-            - out["pat_bos_down"][i]
-            - out["pat_choch_bear"][i]
-            - out["pat_wedge_rising"][i]
-            - out["pat_liquidity_sweep_high"][i]
-            - out["pat_triangle_desc"][i]
-            - out["pat_pennant_bear"][i]
-            - out["pat_rectangle_bear"][i]
-            - out["pat_compression_breakout_down"][i]
-            - out["pat_harmonic_gartley_bear"][i]
-            - out["pat_elliott_impulse_bear"][i]
-            - out["pat_wolfe_bear"][i]
-            + out["structure_hh_hl"][i]
-        )
+        score = _chart_pattern_score_at(out, i, score_weights)
         out["chart_pattern_score"][i] = float(score)
 
     return pd.DataFrame(out, index=df.index)
+
+
+# Bullish / bearish contributors to chart_pattern_score (includes all harmonics)
+_CHART_SCORE_BULL = (
+    "pat_double_bottom",
+    "pat_triple_bottom",
+    "pat_inv_head_shoulders",
+    "pat_flag_bull",
+    "pat_breakout_up",
+    "pat_bos_up",
+    "pat_choch_bull",
+    "pat_wedge_falling",
+    "pat_liquidity_sweep_low",
+    "pat_triangle_asc",
+    "pat_cup_handle",
+    "pat_pennant_bull",
+    "pat_rectangle_bull",
+    "pat_compression_breakout_up",
+    "pat_harmonic_gartley_bull",
+    "pat_harmonic_bat_bull",
+    "pat_harmonic_butterfly_bull",
+    "pat_harmonic_crab_bull",
+    "pat_elliott_impulse_bull",
+    "pat_wolfe_bull",
+)
+_CHART_SCORE_BEAR = (
+    "pat_double_top",
+    "pat_triple_top",
+    "pat_head_shoulders",
+    "pat_flag_bear",
+    "pat_breakout_down",
+    "pat_bos_down",
+    "pat_choch_bear",
+    "pat_wedge_rising",
+    "pat_liquidity_sweep_high",
+    "pat_triangle_desc",
+    "pat_pennant_bear",
+    "pat_rectangle_bear",
+    "pat_compression_breakout_down",
+    "pat_harmonic_gartley_bear",
+    "pat_harmonic_bat_bear",
+    "pat_harmonic_butterfly_bear",
+    "pat_harmonic_crab_bear",
+    "pat_elliott_impulse_bear",
+    "pat_wolfe_bear",
+)
+
+
+def chart_score_weights_from_rankings(
+    ranking_items: list[dict[str, Any]] | None,
+) -> dict[str, float]:
+    """Derive per-pattern score weights from rankings quality/success (safe fallback 1.0)."""
+    weights: dict[str, float] = {}
+    keys = set(_CHART_SCORE_BULL) | set(_CHART_SCORE_BEAR)
+    if not ranking_items:
+        return {k: 1.0 for k in keys}
+    by_key = {
+        str(r.get("pattern_key") or r.get("key") or ""): r
+        for r in ranking_items
+        if r.get("pattern_key") or r.get("key")
+    }
+    for k in keys:
+        row = by_key.get(k)
+        if not row:
+            weights[k] = 1.0
+            continue
+        q = row.get("quality_score")
+        sr = row.get("success_rate")
+        try:
+            qf = float(q) if q is not None else 0.5
+        except (TypeError, ValueError):
+            qf = 0.5
+        try:
+            srf = float(sr) if sr is not None else 0.5
+        except (TypeError, ValueError):
+            srf = 0.5
+        # Map ~[0.4, 0.8] quality/success into ~[0.5, 1.5] weight
+        w = 0.5 + max(0.0, min(1.0, qf)) + max(0.0, min(1.0, srf - 0.5))
+        weights[k] = float(max(0.25, min(2.0, w)))
+    return weights
+
+
+def _chart_pattern_score_at(
+    out: dict[str, np.ndarray],
+    i: int,
+    score_weights: dict[str, float] | None,
+) -> float:
+    w = score_weights or {}
+    score = 0.0
+    for key in _CHART_SCORE_BULL:
+        score += float(out[key][i]) * float(w.get(key, 1.0))
+    for key in _CHART_SCORE_BEAR:
+        score -= float(out[key][i]) * float(w.get(key, 1.0))
+    score += float(out["structure_hh_hl"][i])
+    return score
 
 
 def compound_patterns(df: pd.DataFrame) -> pd.DataFrame:

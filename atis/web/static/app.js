@@ -304,6 +304,74 @@ let _dataRefreshPromise = null;
 let _latestModels = null;
 let _latestTraining = null;
 
+const TRAINABLE_TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4"];
+const TRAIN_TF_SELECTION_KEY = "atis.train.selectedTfs";
+
+function loadTrainTfSelection() {
+  try {
+    const raw = window.localStorage.getItem(TRAIN_TF_SELECTION_KEY);
+    if (!raw) return new Set(TRAINABLE_TIMEFRAMES);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set(TRAINABLE_TIMEFRAMES);
+    const filtered = parsed
+      .map((t) => String(t).toUpperCase())
+      .filter((t) => TRAINABLE_TIMEFRAMES.includes(t));
+    return filtered.length ? new Set(filtered) : new Set(TRAINABLE_TIMEFRAMES);
+  } catch {
+    return new Set(TRAINABLE_TIMEFRAMES);
+  }
+}
+
+let _selectedTrainTfs = loadTrainTfSelection();
+
+function saveTrainTfSelection() {
+  try {
+    window.localStorage.setItem(
+      TRAIN_TF_SELECTION_KEY,
+      JSON.stringify([..._selectedTrainTfs]),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function getSelectedTrainTimeframes() {
+  return TRAINABLE_TIMEFRAMES.filter((tf) => _selectedTrainTfs.has(tf));
+}
+
+function setTrainTfSelected(tf, on) {
+  const key = String(tf).toUpperCase();
+  if (!TRAINABLE_TIMEFRAMES.includes(key)) return;
+  if (on) _selectedTrainTfs.add(key);
+  else _selectedTrainTfs.delete(key);
+  saveTrainTfSelection();
+  syncTrainTfSelectionUi();
+}
+
+function syncTrainTfSelectionUi() {
+  const selected = getSelectedTrainTimeframes();
+  const countEl = $("#train-tf-selected-count");
+  if (countEl) countEl.textContent = `محدّد: ${selected.length}`;
+  const allEl = $("#train-tf-all");
+  if (allEl) {
+    allEl.checked = selected.length === TRAINABLE_TIMEFRAMES.length;
+    allEl.indeterminate = selected.length > 0 && selected.length < TRAINABLE_TIMEFRAMES.length;
+  }
+  $$("#current-run-tf-cards .tf-status-card").forEach((card) => {
+    const tf = card.getAttribute("data-tf");
+    const checked = tf && _selectedTrainTfs.has(tf);
+    card.classList.toggle("is-selected", Boolean(checked));
+    const input = card.querySelector('input[name="train-tf"]');
+    if (input) input.checked = Boolean(checked);
+  });
+  const btn = $("#btn-train-selected");
+  if (btn && !btn.disabled) {
+    btn.textContent = selected.length
+      ? `تدريب الأطر المحددة (${selected.length})`
+      : "اختر إطاراً للتدريب";
+  }
+}
+
 const ACTIVE_TAB_KEY = "atis.activeTab";
 
 function getSavedTab() {
@@ -682,8 +750,472 @@ async function saveLiveSettings() {
     body: JSON.stringify(body),
   });
   applyLiveSettingsForm(s);
-  toast(s.use_live_spread_filter ? "تم التفعيل: موديل ثم سبريد" : "تم الإلغاء: موديل فقط");
   return s;
+}
+
+/* ─── MT5 credentials (secrets.env) ─── */
+
+if (typeof window._mt5SettingsCache === "undefined") window._mt5SettingsCache = null;
+if (typeof window._mt5PasswordDirty === "undefined") window._mt5PasswordDirty = false;
+
+function applyMt5ConnectionBanner(payload) {
+  const banner = $("#mt5-settings-banner");
+  const chip = $("#mt5-conn-chip");
+  const conn = payload?.connection || {};
+  const ok = !!(conn.ok ?? payload?.ok);
+  if (chip) {
+    chip.textContent = ok
+      ? `متصل · ${conn.login || "—"} · ${fmt(conn.balance, 2)} ${conn.currency || ""}`.trim()
+      : "غير متصل";
+    chip.className = ok ? "chip ok" : "chip bad";
+  }
+  if (banner) {
+    if (ok) {
+      banner.className = "banner ok";
+      banner.textContent = `الاتصال ناجح · الحساب ${conn.login || "—"} · السيرفر ${conn.server || "—"} · الرصيد ${fmt(conn.balance, 2)} ${conn.currency || ""}`;
+    } else {
+      banner.className = "banner bad";
+      const err = conn.error || payload?.connect_error || payload?.error || "تعذر الاتصال بـ MT5";
+      banner.textContent = err;
+    }
+  }
+}
+
+function applyMt5SettingsForm(s) {
+  if (!s) return;
+  window._mt5SettingsCache = s;
+  const login = $("#setting-mt5-login");
+  if (login) login.value = s.login || "";
+  const server = $("#setting-mt5-server");
+  if (server) server.value = s.server || "";
+  const path = $("#setting-mt5-path");
+  if (path) path.value = s.path || "";
+  const pwd = $("#setting-mt5-password");
+  if (pwd) {
+    pwd.value = s.password_set ? (s.password_masked || "••••••••") : "";
+    window._mt5PasswordDirty = false;
+  }
+  applyMt5ConnectionBanner(s);
+}
+
+function collectMt5SettingsFromForm() {
+  const pwdEl = $("#setting-mt5-password");
+  const rawPwd = pwdEl?.value || "";
+  const keepPwd = !window._mt5PasswordDirty || rawPwd === "" || rawPwd === "••••••••" || rawPwd === "********";
+  const body = {
+    login: ($("#setting-mt5-login")?.value || "").trim(),
+    server: ($("#setting-mt5-server")?.value || "").trim(),
+    path: ($("#setting-mt5-path")?.value || "").trim(),
+    reconnect: true,
+  };
+  if (!keepPwd) body.password = rawPwd;
+  return body;
+}
+
+async function loadMt5Settings() {
+  const s = await api("/api/settings/mt5");
+  applyMt5SettingsForm(s);
+  return s;
+}
+
+async function saveMt5Settings({ quiet = false, optional = false } = {}) {
+  const body = collectMt5SettingsFromForm();
+  if (!body.login || !body.server) {
+    if (optional) return null;
+    throw new Error("أدخل رقم الحساب والسيرفر");
+  }
+  const s = await api("/api/settings/mt5", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  applyMt5SettingsForm(s);
+  if (!quiet) {
+    if (s.connect_error || (s.connection && s.connection.ok === false)) {
+      toast(s.connect_error || s.connection?.error || "تم الحفظ لكن الاتصال فشل");
+    } else {
+      toast("تم حفظ بيانات MT5");
+    }
+  }
+  return s;
+}
+
+async function testMt5Settings() {
+  const body = collectMt5SettingsFromForm();
+  if (!body.login || !body.server) {
+    throw new Error("أدخل رقم الحساب والسيرفر للتحقق");
+  }
+  const s = await api("/api/settings/mt5/test", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  applyMt5SettingsForm(s);
+  if (s.ok === false || (s.connection && s.connection.ok === false)) {
+    throw new Error(s.error || s.connection?.error || "فشل التحقق من اتصال MT5");
+  }
+  toast("التحقق من الاتصال ناجح");
+  return s;
+}
+
+/* ─── Training / learning / validation / test settings ─── */
+
+if (typeof window._trainingSettingsCache === "undefined") window._trainingSettingsCache = null;
+
+const TRAINING_SETTING_GROUPS = [
+  {
+    id: "split",
+    title: "التقسيم · التدريب · التحقق · الاختبار",
+    match: (k) =>
+      /^(train_ratio|val_ratio|test_ratio|walk_forward_splits|fold_validation_ratio|validation_mode|rolling_train_size|rolling_test_size|purge_embargo|latency_bars|execution_delay_bars|max_train_bars|max_train_bars_by_tf|min_rows|default_symbols|default_timeframes|promotion_validation_mode|use_promotion_validation_mode)$/.test(k)
+      || k.startsWith("cpcv_"),
+  },
+  {
+    id: "labeling",
+    title: "التسمية والحدود (Labeling)",
+    match: (k) =>
+      /^(labeling|horizon_bars|horizon_by_timeframe|barrier_|train_on_directional|use_meta_labeling|label_)/.test(k),
+  },
+  {
+    id: "features",
+    title: "الميزات والتعلم (Features)",
+    match: (k) =>
+      /^(top_features|stable_feature|engineer_learning|cross_tf|drop_constant|drop_registry|prefer_relative|feature_|shap_|permutation_|auto_drop|time_decay|data_intel)/.test(k),
+  },
+  {
+    id: "model",
+    title: "الموديل و Hyperparameters (LightGBM)",
+    match: (k) =>
+      /^(model_family|task|baseline_model|lgb_|use_ensemble|model_zoo|nested_hp|calibrate_probabilities|write_final_model|allow_paper_final|prefer_ensemble|use_ensemble_on|challenger_|prefer_simpler)/.test(k),
+  },
+  {
+    id: "policy",
+    title: "سياسة التداول والعتبات",
+    match: (k) =>
+      /^(decision_threshold|min_trade_confidence|directional_edge|confidence_quantile|min_confidence|max_confidence|cost_edge|target_trade_rate|max_fold_trade_rate|quality_first|tune_trade|tune_policy|regime_filter|regime_atr|regime_trend|regime_eval|regime_min|trend_align|non_overlapping|short_edge|overtrading|confidence_sizing)/.test(k),
+  },
+  {
+    id: "gates",
+    title: "بوابات الجودة والتحقق (Gates)",
+    match: (k) =>
+      /^(fail_on_|min_sharpe|max_drawdown|min_trades|require_|dq_|early_fold|min_deploy|min_val_|min_liquid|min_expectancy|max_pbo|max_sharpe|max_uncapped|max_path|min_trade_sharpe|enforce_min|rank_by|val_test|gate_on|apply_oos|deploy_|policy_min|min_median|min_reliable|min_auc|min_active|min_oos|min_crisis|min_recent|crisis_holdout|recent_holdout|min_policy|fold_stability|expectancy_cost|min_live|min_metric|min_generalization|live_ready|force_shadow|quarantine|retrain_drift|research_|session_min|iterative_|kpi_|sharpe_ann|bootstrap_|fail_h4|honest_val|penalize_pegged|self_diagnostic|nested_deploy|apply_self|monte_carlo|max_train_val)/.test(k),
+  },
+  {
+    id: "costs",
+    title: "التكاليف واختبارات الضغط",
+    match: (k) =>
+      /^(commission_per_lot|spread_pips|slippage_pips|dynamic_execution|vol_slippage|stress_)/.test(k),
+  },
+  {
+    id: "deep",
+    title: "التعلم العميق (Deep Learning / LLModel)",
+    match: (k) => k === "deep_learning",
+  },
+  {
+    id: "other",
+    title: "إعدادات أخرى",
+    match: () => true,
+  },
+];
+
+const TRAINING_LABELS_AR = {
+  train_ratio: "نسبة التدريب",
+  val_ratio: "نسبة التحقق (Validation)",
+  test_ratio: "نسبة الاختبار (Test)",
+  walk_forward_splits: "عدد طيات Walk-Forward",
+  fold_validation_ratio: "نسبة التحقق داخل الطية",
+  validation_mode: "وضع التحقق",
+  rolling_train_size: "حجم نافذة التدريب (rolling)",
+  rolling_test_size: "حجم نافذة الاختبار (rolling)",
+  purge_embargo: "Purge / Embargo",
+  labeling: "طريقة التسمية",
+  horizon_bars: "أفق التسمية (bars)",
+  barrier_atr_multiplier: "مضاعف حاجز ATR",
+  train_on_directional_only: "تدريب على الاتجاهي فقط",
+  top_features: "عدد أفضل الميزات",
+  engineer_learning_features: "هندسة ميزات التعلم",
+  cross_tf_features: "ميزات عبر الإطارات",
+  baseline_model: "الموديل الأساسي",
+  lgb_estimators: "LightGBM estimators",
+  lgb_learning_rate: "معدل التعلم",
+  lgb_max_depth: "أقصى عمق",
+  lgb_num_leaves: "عدد الأوراق",
+  lgb_early_stopping: "إيقاف مبكر",
+  lgb_early_stopping_rounds: "جولات الإيقاف المبكر",
+  nested_hp_search: "بحث Hyperparameters متداخل",
+  nested_hp_trials: "عدد تجارب HPO",
+  decision_threshold: "عتبة القرار",
+  min_trade_confidence: "أدنى ثقة للصفقة",
+  directional_edge: "هامش الاتجاه",
+  target_trade_rate: "معدل الصفقات المستهدف",
+  min_sharpe_ratio: "أدنى Sharpe",
+  max_drawdown_threshold: "أقصى Drawdown",
+  min_trades_oos: "أدنى صفقات OOS",
+  commission_per_lot: "عمولة لكل لوت",
+  spread_pips: "سبريد التدريب (pips)",
+  slippage_pips: "انزلاق (pips)",
+  deep_learning: "إعدادات التعلم العميق",
+  default_symbols: "الرموز الافتراضية",
+  default_timeframes: "الإطارات الافتراضية",
+  max_train_bars: "أقصى شموع للتدريب",
+  promotion_validation_mode: "وضع تحقق الترقية",
+  use_promotion_validation_mode: "تفعيل تحقق الترقية",
+  cpcv_n_groups: "CPCV مجموعات",
+  cpcv_n_test_groups: "CPCV مجموعات اختبار",
+  monte_carlo_paths: "مسارات Monte Carlo",
+};
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatTrainingValueForInput(val) {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "object") return JSON.stringify(val, null, 2);
+  return String(val);
+}
+
+function parseTrainingInputValue(raw, original) {
+  const text = String(raw ?? "").trim();
+  if (text === "" && (original === null || original === undefined)) return null;
+  if (typeof original === "boolean") return text === "true" || text === "1";
+  if (Array.isArray(original) || (original && typeof original === "object")) {
+    if (text === "") return Array.isArray(original) ? [] : {};
+    return JSON.parse(text);
+  }
+  if (original === null) {
+    if (text === "" || text.toLowerCase() === "null") return null;
+    if (/^-?\d+$/.test(text)) return Number(text);
+    if (/^-?\d+\.\d+$/.test(text)) return Number(text);
+    if (text === "true") return true;
+    if (text === "false") return false;
+    return text;
+  }
+  if (typeof original === "number") {
+    if (text === "") return null;
+    const n = Number(text);
+    if (Number.isNaN(n)) throw new Error(`قيمة رقمية غير صالحة: ${text}`);
+    return n;
+  }
+  return text;
+}
+
+function openTrainingHelp(key) {
+  const helpFn = window.getTrainingSettingHelp;
+  const help = typeof helpFn === "function"
+    ? helpFn(key)
+    : {
+        key,
+        why: "تعذر تحميل ملف الشروحات.",
+        up: "—",
+        down: "—",
+      };
+  const ar = TRAINING_LABELS_AR[key] || "";
+  const modal = $("#help-modal");
+  if (!modal) return;
+  $("#help-modal-title").textContent = ar || "شرح الإعداد";
+  $("#help-modal-key").textContent = key;
+  $("#help-modal-body").innerHTML = `
+    <div class="help-block">
+      <h3>لماذا يُستخدم؟</h3>
+      <p>${escapeHtml(help.why || "—")}</p>
+    </div>
+    <div class="help-block up">
+      <h3>عند الزيادة / التفعيل</h3>
+      <p>${escapeHtml(help.up || "—")}</p>
+    </div>
+    <div class="help-block down">
+      <h3>عند النقصان / الإلغاء</h3>
+      <p>${escapeHtml(help.down || "—")}</p>
+    </div>`;
+  modal.hidden = false;
+}
+
+function closeTrainingHelp() {
+  const modal = $("#help-modal");
+  if (modal) modal.hidden = true;
+}
+
+function renderTrainingSettingRow(key, value) {
+  const ar = TRAINING_LABELS_AR[key] || "";
+  const path = escapeHtml(key);
+  const label = `<div class="settings-label-row">
+    <div class="settings-label-text">
+      <code>${path}</code>${ar ? `<span class="settings-key-ar">${escapeHtml(ar)}</span>` : ""}
+    </div>
+    <button type="button" class="settings-help-btn" data-train-help="${path}" title="شرح مفصل" aria-label="شرح ${path}">?</button>
+  </div>`;
+
+  if (typeof value === "boolean") {
+    return `<tr>
+      <th>${label}</th>
+      <td>
+        <label class="settings-bool">
+          <input type="checkbox" data-train-key="${path}" data-train-type="bool" ${value ? "checked" : ""} />
+          <span data-bool-label>${value ? "مفعّل" : "معطّل"}</span>
+        </label>
+      </td>
+    </tr>`;
+  }
+
+  if (value !== null && typeof value === "object") {
+    return `<tr>
+      <th>${label}</th>
+      <td>
+        <textarea class="btn settings-input wide" data-train-key="${path}" data-train-type="json" spellcheck="false">${escapeHtml(formatTrainingValueForInput(value))}</textarea>
+      </td>
+    </tr>`;
+  }
+
+  const inputType = typeof value === "number" ? "number" : "text";
+  const step = typeof value === "number" && !Number.isInteger(value) ? "any" : (typeof value === "number" ? "1" : undefined);
+  return `<tr>
+    <th>${label}</th>
+    <td>
+      <input class="btn settings-input" data-train-key="${path}" data-train-type="${typeof value === "number" ? "number" : (value === null ? "nullish" : "text")}" type="${inputType}" ${step ? `step="${step}"` : ""} value="${escapeHtml(formatTrainingValueForInput(value))}" />
+    </td>
+  </tr>`;
+}
+
+function applyTrainingSettingsForm(payload) {
+  const settings = payload?.settings || {};
+  window._trainingSettingsCache = settings;
+  const root = $("#training-settings-root");
+  const countEl = $("#training-settings-count");
+  if (!root) return;
+
+  const buckets = new Map(TRAINING_SETTING_GROUPS.map((g) => [g.id, []]));
+  const claimed = new Set();
+  for (const g of TRAINING_SETTING_GROUPS) {
+    if (g.id === "other") continue;
+    for (const [key, value] of Object.entries(settings)) {
+      if (claimed.has(key)) continue;
+      if (g.match(key)) {
+        buckets.get(g.id).push([key, value]);
+        claimed.add(key);
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(settings)) {
+    if (!claimed.has(key)) buckets.get("other").push([key, value]);
+  }
+
+  const parts = [];
+  for (const g of TRAINING_SETTING_GROUPS) {
+    const rows = buckets.get(g.id) || [];
+    if (!rows.length) continue;
+    const open = g.id === "split" || g.id === "model" || g.id === "policy" ? " open" : "";
+    parts.push(`<details class="settings-group"${open}>
+      <summary>${escapeHtml(g.title)} <span class="settings-group-count">${rows.length}</span></summary>
+      <div class="settings-group-body">
+        <table class="kv"><tbody>
+          ${rows.map(([k, v]) => renderTrainingSettingRow(k, v)).join("")}
+        </tbody></table>
+      </div>
+    </details>`);
+  }
+  root.innerHTML = parts.join("") || `<article class="card"><p class="card-note">لا توجد إعدادات تدريب.</p></article>`;
+
+  root.querySelectorAll('input[data-train-type="bool"]').forEach((el) => {
+    const sync = () => {
+      const wrap = el.closest("label");
+      if (!wrap) return;
+      const span = wrap.querySelector("[data-bool-label]");
+      if (span) span.textContent = el.checked ? "مفعّل" : "معطّل";
+    };
+    el.addEventListener("change", sync);
+  });
+
+  if (countEl) {
+    countEl.textContent = `${Object.keys(settings).length} إعداداً من engine4_training — تؤثر على التدريب والتحقق والاختبار`;
+  }
+
+  if (root && !root._helpBound) {
+    root._helpBound = true;
+    root.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-train-help]");
+      if (!btn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTrainingHelp(btn.getAttribute("data-train-help"));
+    });
+  }
+}
+
+function collectTrainingSettingsFromForm() {
+  const base = { ...(window._trainingSettingsCache || {}) };
+  const root = $("#training-settings-root");
+  if (!root) return base;
+
+  const errors = [];
+  root.querySelectorAll("[data-train-key]").forEach((el) => {
+    const key = el.getAttribute("data-train-key");
+    const type = el.getAttribute("data-train-type");
+    const original = base[key];
+    try {
+      if (type === "bool") {
+        base[key] = !!el.checked;
+        return;
+      }
+      if (type === "json") {
+        const text = String(el.value || "").trim();
+        base[key] = text === "" ? (Array.isArray(original) ? [] : {}) : JSON.parse(text);
+        return;
+      }
+      if (type === "number") {
+        const text = String(el.value ?? "").trim();
+        if (text === "") {
+          base[key] = null;
+          return;
+        }
+        const n = Number(text);
+        if (Number.isNaN(n)) throw new Error("رقم غير صالح");
+        base[key] = n;
+        return;
+      }
+      if (type === "nullish") {
+        base[key] = parseTrainingInputValue(el.value, original ?? null);
+        return;
+      }
+      base[key] = String(el.value ?? "");
+    } catch (e) {
+      errors.push(`${key}: ${e.message || e}`);
+    }
+  });
+
+  if (errors.length) {
+    throw new Error(`تعذر قراءة بعض الإعدادات:\n${errors.slice(0, 5).join("\n")}`);
+  }
+  return base;
+}
+
+async function loadTrainingSettings() {
+  const payload = await api("/api/settings/training");
+  applyTrainingSettingsForm(payload);
+  return payload;
+}
+
+async function saveTrainingSettings() {
+  const settings = collectTrainingSettingsFromForm();
+  const payload = await api("/api/settings/training", {
+    method: "POST",
+    body: JSON.stringify({ settings }),
+  });
+  applyTrainingSettingsForm(payload);
+  return payload;
+}
+
+async function loadAllSettings() {
+  await Promise.all([loadLiveSettings(), loadMt5Settings(), loadTrainingSettings()]);
+}
+
+async function saveAllSettings() {
+  await saveLiveSettings();
+  await saveMt5Settings({ quiet: true, optional: true });
+  await saveTrainingSettings();
+  toast("تم حفظ كل الإعدادات");
 }
 
 function switchTab(name) {
@@ -694,7 +1226,7 @@ function switchTab(name) {
     refreshDataTab().catch((e) => toast(e.message));
   }
   if (name === "settings") {
-    loadLiveSettings().catch((e) => toast(e.message));
+    loadAllSettings().catch((e) => toast(e.message));
   }
 }
 
@@ -788,15 +1320,18 @@ function renderTradingIntelligencePanel(t) {
   const shapTable = $("#tie-shap-table");
 
   if (chip) {
+    const isV17 = String(pipe).includes("v17") || String(pipe).includes("priority-hardening") || String(pipe).includes("weakness-hardening");
     const isV16 = String(pipe).includes("v16") || String(pipe).includes("research-factory");
     const isV15 = String(pipe).includes("v15") || String(pipe).includes("intelligent-training");
     const isEnt = String(pipe).includes("v14") || String(pipe).includes("enterprise");
     const isTie = String(pipe).includes("v13") || String(pipe).includes("trading-intelligence");
-    chip.textContent = isV16
-      ? `Research Factory · ${pipe}`
-      : (isV15
-        ? `Intelligent · ${pipe}`
-        : (isEnt ? `Enterprise · ${pipe}` : (isTie ? `TIE · ${pipe}` : `pipeline ${pipe}`)));
+    chip.textContent = isV17
+      ? `Weakness Hardening · ${pipe}`
+      : (isV16
+        ? `Research Factory · ${pipe}`
+        : (isV15
+          ? `Intelligent · ${pipe}`
+          : (isEnt ? `Enterprise · ${pipe}` : (isTie ? `TIE · ${pipe}` : `pipeline ${pipe}`))));
   }
 
   if (t?.empty && !fin.sharpe && !Object.keys(regime).length) {
@@ -855,7 +1390,8 @@ function renderTradingIntelligencePanel(t) {
       ["وضع التحقق", valMode],
       ["Nested HP", `${nested.mode || (nested.enabled ? "single" : "—")} · ${nested.best_family || "—"}`],
       ["DSR", fmt(dsr.deflated_sharpe, 4)],
-      ["PBO", fmt(pbo.pbo, 4)],
+      ["PBO", fmt(pbo.pbo, 4) + (Number(pbo.soft_warn) > 0.5 ? " (تحذير ناعم)" : (Number(pbo.material) > 0.5 ? " (فعّال)" : ""))],
+      ["PBO OOS retention", fmt(pbo.oos_retention, 3)],
       ["Stress robust / worst Sh", `${stress.robust ?? "—"} / ${fmt(stress.worst_sharpe, 2)}`],
       ["MC p_profit / p_dd>25%", `${fmt(mc.p_profit, 3)} / ${fmt(mc.p_dd_gt_25pct, 3)}`],
       ["Zoo tried", fmt(zoo.n_models_tried, 0)],
@@ -983,6 +1519,11 @@ function renderCurrentRunPanel(t, liveDetails) {
   const matrix = (Object.keys(liveTfs).length
     ? Object.values(liveTfs)
     : (t?.matrix_current_run || []));
+  const byTf = {};
+  for (const m of matrix) {
+    const key = String(m.timeframe || "").toUpperCase();
+    if (key) byTf[key] = m;
+  }
   const pipeline = live.pipeline_version || summary.pipeline_version || t?.last_run?.pipeline_version || "—";
   if (pipeEl) pipeEl.textContent = `pipeline ${pipeline}`;
 
@@ -992,7 +1533,9 @@ function renderCurrentRunPanel(t, liveDetails) {
   const errors = summary.current_run_errors ?? matrix.filter((m) => m.error).length;
   if (panelMeta) {
     const reasons = (summary.current_run_reject_reasons || []).slice(0, 4).join(" · ") || "—";
-    panelMeta.innerHTML = `دُرِّب <b>${trained ?? "—"}</b> · اجتاز <b>${passed ?? 0}</b> · رُفض <b>${rejected ?? 0}</b> · أخطاء <b>${errors ?? 0}</b>`
+    const selectedN = getSelectedTrainTimeframes().length;
+    panelMeta.innerHTML = `للتدريب: حدّد الصناديق ثم اضغط الزر · محدّد الآن <b>${selectedN}</b>`
+      + `<br/>دُرِّب <b>${trained ?? "—"}</b> · اجتاز <b>${passed ?? 0}</b> · رُفض <b>${rejected ?? 0}</b> · أخطاء <b>${errors ?? 0}</b>`
       + (summary.run_id ? ` · run <code>${summary.run_id}</code>` : "")
       + `<br/>أسباب الرفض: ${reasons}`;
   }
@@ -1013,12 +1556,19 @@ function renderCurrentRunPanel(t, liveDetails) {
     }).join("");
   }
 
-  cardsEl.innerHTML = matrix.length
-    ? matrix.map((m) => {
+  cardsEl.innerHTML = TRAINABLE_TIMEFRAMES.map((tf) => {
+        const m = byTf[tf] || { timeframe: tf, status: "queued", empty: true };
         const mm = m.metrics || m;
-        const status = m.stage || m.status || (m.passed_gates ? "passed" : (m.empty ? "not_trained_this_run" : "rejected"));
+        // Prefer gate outcome over pipeline stage: stage "done" must not show as "تم" when rejected.
+        const rawStage = m.stage || m.status || "";
+        const status = m.error ? "error"
+          : (m.empty && !m.model_version && m.passed_gates == null) ? (rawStage || "not_trained_this_run")
+          : (m.passed_gates === true) ? "passed"
+          : (m.passed_gates === false) ? "rejected"
+          : (rawStage || (m.empty ? "not_trained_this_run" : "queued"));
         const tone = m.error || status === "error" ? "bad"
-          : (m.passed_gates === true || status === "passed" || status === "done" && m.passed_gates) ? "ok"
+          : (status === "passed") ? "ok"
+          : (status === "rejected") ? "bad"
           : (status === "not_trained_this_run" || status === "queued") ? "warn"
           : (["walk_forward", "loading_data", "features", "val_policy", "test_oos", "regime_validation", "gates", "deploy_holdout", "data_intelligence", "feature_intelligence", "model_zoo", "stress_mc"].includes(status) ? "running" : "warn");
         const gates = gateChipsHtml(m.gate_failures_detail, m.gate_failures);
@@ -1054,7 +1604,11 @@ function renderCurrentRunPanel(t, liveDetails) {
               </tbody></table></div></details>`
           : "";
         const regimeTone = regime.stable === false ? "bad" : (regime.stable === true ? "ok" : "");
-        const pboTone = Number(pbo) >= 0.55 ? "bad" : (pbo != null ? "ok" : "");
+        const pboRep = adv.pbo || {};
+        const pboMaterial = Number(pboRep.material) > 0.5;
+        const pboTone = Number(pbo) >= 0.55
+          ? (pboMaterial ? "bad" : "warn")
+          : (pbo != null ? "ok" : "");
         const tieStrip = `<div class="tie-live-strip">
           ${tiePill("mode", m.validation_mode || "expanding")}
           ${tiePill("Exp", fmt(mm.expectancy, 4), clsNum(mm.expectancy) === "num-ok" ? "ok" : (clsNum(mm.expectancy) === "num-bad" ? "bad" : ""))}
@@ -1066,8 +1620,16 @@ function renderCurrentRunPanel(t, liveDetails) {
           ${(m.model_zoo || {}).winner ? tiePill("Zoo", String((m.model_zoo || {}).winner)) : ""}
           ${know.advisory?.retrain_suggested ? tiePill("Knowledge", "retrain", "warn") : tiePill("Knowledge", String(know.n_episodes ?? "—"))}
         </div>`;
-        return `<div class="tf-status-card ${tone}">
-          <h3>${m.timeframe || "—"} · ${stageLabelAr(status)}</h3>
+        const checked = _selectedTrainTfs.has(tf) ? "checked" : "";
+        const selectedCls = _selectedTrainTfs.has(tf) ? " is-selected" : "";
+        return `<div class="tf-status-card ${tone}${selectedCls}" data-tf="${tf}">
+          <div class="tf-status-card-head">
+            <h3>${tf} · ${stageLabelAr(status)}</h3>
+            <label class="tf-train-check" title="ضمّن هذا الإطار في التدريب">
+              <input type="checkbox" name="train-tf" value="${tf}" ${checked} />
+              درّب
+            </label>
+          </div>
           <div class="meta">${m.pipeline_version || pipeline} · ${m.model_version || m.version || "—"}
             ${m.liquidity_rescue ? " · liquidity rescue" : ""}</div>
           <div class="metric-line"><span>Acc / AUC</span><b>${fmt(mm.acc ?? mm.accuracy, 3)} / ${fmt(mm.auc ?? m.auc, 3)}</b></div>
@@ -1085,8 +1647,8 @@ function renderCurrentRunPanel(t, liveDetails) {
           <div>${gates || (m.passed_gates ? '<span class="gate-chip" style="background:var(--ok-bg);color:var(--ok);border-color:#c6e6d5">اجتاز</span>' : "")}</div>
           ${foldsHtml}
         </div>`;
-      }).join("")
-    : `<div class="card-note">لا توجد بطاقات لهذا التشغيل بعد.</div>`;
+      }).join("");
+  syncTrainTfSelectionUi();
 }
 
 function renderTraining(t) {
@@ -1125,10 +1687,12 @@ function renderTraining(t) {
           const statusAr = m.error ? "خطأ" : (m.passed_gates ? "اجتاز" : "رُفض");
           const statusCls = m.error ? "num-bad" : (m.passed_gates ? "num-ok" : "num-bad");
           const regime = m.regime_validation || {};
-          const pbo = ((m.advanced_eval || {}).pbo || {}).pbo;
+          const pboRep = (m.advanced_eval || {}).pbo || {};
+          const pbo = pboRep.pbo;
           const regimeLabel = regime.stable === false ? "unstable" : (regime.stable === true ? "stable" : "—");
           const regimeCls = regime.stable === false ? "num-bad" : (regime.stable === true ? "num-ok" : "");
-          const pboCls = Number(pbo) >= 0.55 ? "num-bad" : "";
+          const pboMaterial = Number(pboRep.material) > 0.5;
+          const pboCls = Number(pbo) >= 0.55 ? (pboMaterial ? "num-bad" : "num-warn") : "";
           return `<tr>
             <td><b>${m.timeframe}</b></td>
             <td class="${statusCls}">${statusAr}</td>
@@ -1145,7 +1709,7 @@ function renderTraining(t) {
             <td><button class="btn" data-select-tf="${m.timeframe}" type="button">تفاصيل</button></td>
           </tr>`;
         }).join("")
-      : `<tr><td colspan="13">لا نتائج لهذا التشغيل بعد — اضغط تدريب كل الأطر (M1…H4)</td></tr>`;
+      : `<tr><td colspan="13">لا نتائج لهذا التشغيل بعد — حدّد الأطر من صناديق التشغيل الحالي ثم اضغط التدريب</td></tr>`;
   }
 
   // Champion / latest matrix
@@ -1216,7 +1780,7 @@ function renderTraining(t) {
     banner.innerHTML = `بطل محفوظ فقط · الإطار <b>${t.final_model.timeframe || "—"}</b> — لا تخلطه مع نتيجة التشغيل الحالي`;
   } else if (!t || (t.empty && !(summary.ready > 0))) {
     banner.className = "banner warn";
-    banner.textContent = "لا توجد نماذج مدرّبة بعد. اضغط «تدريب كل الأطر الآن».";
+    banner.textContent = "لا توجد نماذج مدرّبة بعد. حدّد الأطر من التشغيل الحالي ثم اضغط «تدريب الأطر المحددة».";
   } else {
     banner.className = "banner ok";
     banner.innerHTML = `آثار محفوظة <b>${summary.ready || 0}</b>/<b>${summary.total || 7}</b> · الإطار المعروض: <b>${selected}</b>`;
@@ -1527,6 +2091,501 @@ function renderCoverage(data, overview) {
   }).join("");
 }
 
+const REL_FILTER_LABELS = {
+  all: "الكل",
+  co_occurrence: "تزامن",
+  precedes: "يسبق",
+  cancels: "يتعارض",
+};
+
+function relationLabelAr(rel) {
+  return REL_FILTER_LABELS[rel] || rel || "—";
+}
+
+function shortPatternLabel(name, max = 18) {
+  const s = String(name || "");
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "…";
+}
+
+function renderRelationsPanel(rel) {
+  window._relationsData = rel || {};
+  const filter = window._relationsFilter || "all";
+  const edges = (rel.edges || []).filter((e) => filter === "all" || e.relation === filter);
+  const nodes = rel.nodes || [];
+  const sequences = rel.sequences || [];
+  const counts = rel.counts || {};
+  const empty = !!rel.empty || !((rel.edges || []).length);
+
+  if ($("#relations-summary")) {
+    let msg = rel.summary || "لا علاقات بعد — اضغط «إعادة بناء الشبكة» أو شغّل الاستكشاف";
+    if (rel.rebuilt) msg = `أُعيد بناؤها تلقائياً · ${msg}`;
+    if (empty) {
+      msg = "لا علاقات محفوظة لهذا الإطار — اضغط «إعادة بناء الشبكة» لاستخراج التزامن والسبق من الميزات";
+    }
+    $("#relations-summary").textContent = msg;
+  }
+
+  if ($("#relations-stats")) {
+    const nNodes = Array.isArray(nodes) ? nodes.length : Number(nodes) || 0;
+    $("#relations-stats").innerHTML = empty
+      ? `<span class="chip">فارغ</span>`
+      : [
+          `<span class="chip">عقد ${nNodes}</span>`,
+          `<span class="chip">حواف ${(rel.edges || []).length}</span>`,
+          `<span class="chip">تزامن ${counts.co_occurrence ?? 0}</span>`,
+          `<span class="chip">سبق ${counts.precedes ?? 0}</span>`,
+          `<span class="chip">تعارض ${counts.cancels ?? 0}</span>`,
+          rel.bars != null ? `<span class="chip">شموع ${rel.bars}</span>` : "",
+          rel.lag_max != null ? `<span class="chip">أفق سبق ${rel.lag_max}</span>` : "",
+        ].filter(Boolean).join("");
+  }
+
+  $$(".rel-filter").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.relFilter === filter);
+  });
+
+  if ($("#relations-body")) {
+    $("#relations-body").innerHTML = edges.length
+      ? edges.slice(0, 40).map((e) => {
+          const relKey = e.relation || "";
+          return `<tr>
+            <td title="${e.source || ""}">${e.source_label || e.source}</td>
+            <td><span class="rel-badge ${relKey}">${e.relation_ar || relationLabelAr(relKey)}</span></td>
+            <td title="${e.target || ""}">${e.target_label || e.target}</td>
+            <td>${e.count ?? 0}</td>
+            <td>${e.weight != null ? Number(e.weight).toFixed(4) : "—"}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="5">${empty ? "لا بيانات — أعد بناء الشبكة لهذا الإطار" : "لا حواف لهذا الفلتر"}</td></tr>`;
+  }
+
+  if ($("#relations-sequences")) {
+    $("#relations-sequences").innerHTML = sequences.length
+      ? sequences.slice(0, 12).map((s) => {
+          const labs = s.sequence_labels || s.sequence || [];
+          const chain = labs.map((x) => shortPatternLabel(x, 22)).join(" → ");
+          return `<div class="relations-seq-item">
+            <b>${chain}</b>
+            <div class="relations-seq-meta">مرات: ${s.count ?? 0} · قوة: ${s.score != null ? Number(s.score).toFixed(2) : "—"}</div>
+          </div>`;
+        }).join("")
+      : `<div class="relations-seq-item"><span class="relations-seq-meta">${empty ? "لا تسلسلات بعد" : "لا تسلسلات سبق قوية"}</span></div>`;
+  }
+
+  initRelationsGraph(nodes, edges, empty);
+}
+
+function _relationsCanvasPoint(canvas, evt) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / Math.max(rect.width, 1);
+  const scaleY = canvas.height / Math.max(rect.height, 1);
+  const clientX = evt.clientX ?? evt.touches?.[0]?.clientX ?? 0;
+  const clientY = evt.clientY ?? evt.touches?.[0]?.clientY ?? 0;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
+  };
+}
+
+function _relationsHitNode(state, x, y) {
+  // Reverse order so topmost (last drawn) wins
+  for (let i = state.ids.length - 1; i >= 0; i--) {
+    const id = state.ids[i];
+    const p = state.pos[id];
+    if (!p) continue;
+    const r = Math.max(state.radii[id] || 10, 12);
+    if (Math.hypot(x - p.x, y - p.y) <= r + 4) return id;
+  }
+  return null;
+}
+
+function _paintRelationsGraph(state) {
+  const canvas = state.canvas;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fbf8f2";
+  ctx.fillRect(0, 0, w, h);
+
+  if (state.empty || !state.visibleEdges.length) {
+    ctx.fillStyle = "#6d675e";
+    ctx.font = "16px IBM Plex Sans Arabic, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      state.empty ? "لا شبكة للعرض — أعد البناء أو غيّر الإطار" : "لا عقد مرئية لهذا الفلتر",
+      w / 2,
+      h / 2,
+    );
+    return;
+  }
+
+  const { pos, visibleEdges, ids, nodeMap, radii, maxCount } = state;
+  const hoverId = state.hoverId;
+  const dragId = state.dragId;
+  const activeId = dragId || hoverId;
+
+  for (const e of visibleEdges) {
+    const a = pos[e.source];
+    const b = pos[e.target];
+    if (!a || !b) continue;
+    const linked = !activeId || e.source === activeId || e.target === activeId;
+    const t = (e.count || 1) / maxCount;
+    const alphaBoost = linked ? 1 : 0.18;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    if (e.relation === "cancels") {
+      ctx.strokeStyle = `rgba(161, 29, 29, ${(0.25 + t * 0.55) * alphaBoost})`;
+      ctx.setLineDash([]);
+    } else if (e.relation === "precedes") {
+      ctx.strokeStyle = `rgba(15, 107, 69, ${(0.25 + t * 0.55) * alphaBoost})`;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = `rgba(31, 79, 134, ${(0.2 + t * 0.5) * alphaBoost})`;
+      ctx.setLineDash([5, 4]);
+    }
+    ctx.lineWidth = (1 + t * 3.5) * (linked && activeId ? 1.25 : 1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (e.relation === "precedes" && linked) {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x);
+      const ax = b.x - Math.cos(ang) * 14;
+      const ay = b.y - Math.sin(ang) * 14;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - Math.cos(ang - 0.4) * 8, ay - Math.sin(ang - 0.4) * 8);
+      ctx.lineTo(ax - Math.cos(ang + 0.4) * 8, ay - Math.sin(ang + 0.4) * 8);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(15, 107, 69, ${0.75 * alphaBoost})`;
+      ctx.fill();
+    }
+  }
+
+  for (const id of ids) {
+    const n = nodeMap.get(id) || { id, label: id, bias: "neutral", occurrences: 1 };
+    const p = pos[id];
+    if (!p) continue;
+    const r = radii[id] || 10;
+    const isActive = id === activeId;
+    const dimmed = activeId && !isActive;
+    let fill = "#8a8478";
+    if (n.bias === "bullish") fill = "#0f6b45";
+    else if (n.bias === "bearish") fill = "#a11d1d";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * (isActive ? 1.18 : 1), 0, Math.PI * 2);
+    ctx.globalAlpha = dimmed ? 0.35 : 1;
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? "#8b6914" : "#fff";
+    ctx.lineWidth = isActive ? 3 : 2;
+    ctx.stroke();
+    if (isActive) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.18 + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(139, 105, 20, 0.35)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#171513";
+    ctx.font = `${isActive ? "bold 12" : "11"}px IBM Plex Sans Arabic, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(shortPatternLabel(n.label || id, isActive ? 22 : 16), p.x, p.y + r + 12);
+    ctx.globalAlpha = 1;
+  }
+
+  if (activeId) {
+    const n = nodeMap.get(activeId);
+    const p = pos[activeId];
+    if (n && p) {
+      const tip = `${n.label || activeId} · ظهور ${n.occurrences ?? "—"} · روابط ${state.degree[activeId] || 0}`;
+      ctx.font = "12px IBM Plex Sans Arabic, sans-serif";
+      const tw = ctx.measureText(tip).width;
+      const bx = Math.max(8, Math.min(w - tw - 24, p.x - tw / 2 - 8));
+      const by = Math.max(8, p.y - (radii[activeId] || 10) - 34);
+      ctx.fillStyle = "rgba(23, 21, 19, 0.88)";
+      if (typeof ctx.roundRect === "function") {
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + 16, 26, 6);
+        ctx.fill();
+      } else {
+        ctx.fillRect(bx, by, tw + 16, 26);
+      }
+      ctx.fillStyle = "#f7f2ea";
+      ctx.textAlign = "left";
+      ctx.fillText(tip, bx + 8, by + 17);
+    }
+  }
+}
+
+function _bindRelationsGraphInteractions(state) {
+  const canvas = state.canvas;
+  if (canvas._relationsBound) return;
+  canvas._relationsBound = true;
+  canvas.style.touchAction = "none";
+
+  const onDown = (evt) => {
+    const st = window._relationsGraph;
+    if (!st || st.empty) return;
+    const pt = _relationsCanvasPoint(canvas, evt);
+    const hit = _relationsHitNode(st, pt.x, pt.y);
+    if (!hit) return;
+    evt.preventDefault();
+    st.dragId = hit;
+    st.hoverId = hit;
+    st.dragOffset = { x: pt.x - st.pos[hit].x, y: pt.y - st.pos[hit].y };
+    canvas.classList.add("is-dragging");
+    canvas.setPointerCapture?.(evt.pointerId);
+    _paintRelationsGraph(st);
+    _updateRelationsGraphHint(st);
+  };
+
+  const onMove = (evt) => {
+    const st = window._relationsGraph;
+    if (!st || st.empty) return;
+    const pt = _relationsCanvasPoint(canvas, evt);
+    if (st.dragId && st.pos[st.dragId]) {
+      evt.preventDefault();
+      const pad = 24;
+      st.pos[st.dragId].x = Math.max(pad, Math.min(canvas.width - pad, pt.x - st.dragOffset.x));
+      st.pos[st.dragId].y = Math.max(pad, Math.min(canvas.height - pad, pt.y - st.dragOffset.y));
+      _paintRelationsGraph(st);
+      return;
+    }
+    const hit = _relationsHitNode(st, pt.x, pt.y);
+    if (hit !== st.hoverId) {
+      st.hoverId = hit;
+      canvas.style.cursor = hit ? "grab" : "default";
+      _paintRelationsGraph(st);
+      _updateRelationsGraphHint(st);
+    }
+  };
+
+  const onUp = (evt) => {
+    const st = window._relationsGraph;
+    if (!st) return;
+    if (st.dragId) {
+      st.dragId = null;
+      canvas.classList.remove("is-dragging");
+      try {
+        canvas.releasePointerCapture?.(evt.pointerId);
+      } catch (_) { /* ignore */ }
+      const pt = _relationsCanvasPoint(canvas, evt);
+      st.hoverId = _relationsHitNode(st, pt.x, pt.y);
+      canvas.style.cursor = st.hoverId ? "grab" : "default";
+      _paintRelationsGraph(st);
+      _updateRelationsGraphHint(st);
+    }
+  };
+
+  const onLeave = () => {
+    const st = window._relationsGraph;
+    if (!st || st.dragId) return;
+    if (st.hoverId) {
+      st.hoverId = null;
+      canvas.style.cursor = "default";
+      _paintRelationsGraph(st);
+      _updateRelationsGraphHint(st);
+    }
+  };
+
+  canvas.addEventListener("pointerdown", onDown);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("pointerup", onUp);
+  canvas.addEventListener("pointercancel", onUp);
+  canvas.addEventListener("pointerleave", onLeave);
+}
+
+function _updateRelationsGraphHint(state) {
+  const el = $("#relations-graph-hint");
+  if (!el) return;
+  if (state.empty || !state.visibleEdges.length) {
+    el.textContent = "التزامن = خط متقطع · السبق = سهم · التعارض = خط أحمر";
+    return;
+  }
+  const active = state.dragId || state.hoverId;
+  if (active) {
+    const n = state.nodeMap.get(active);
+    el.textContent = `اسحب للتحريك · ${n?.label || active} · ظهور ${n?.occurrences ?? "—"} · روابط ${state.degree[active] || 0}`;
+    return;
+  }
+  el.textContent =
+    `اسحب الدوائر للتحريك · ${state.ids.length} عقدة · ${state.visibleEdges.length} علاقة · أخضر سبق · أزرق تزامن · أحمر تعارض`;
+}
+
+function initRelationsGraph(nodes, edges, empty) {
+  const canvas = $("#relations-graph");
+  if (!canvas) return;
+
+  if (empty || !(edges || []).length) {
+    window._relationsGraph = {
+      canvas,
+      empty: true,
+      ids: [],
+      pos: {},
+      visibleEdges: [],
+      nodeMap: new Map(),
+      radii: {},
+      degree: {},
+      maxCount: 1,
+      hoverId: null,
+      dragId: null,
+      dragOffset: { x: 0, y: 0 },
+      fingerprint: "empty",
+    };
+    _bindRelationsGraphInteractions(window._relationsGraph);
+    _paintRelationsGraph(window._relationsGraph);
+    _updateRelationsGraphHint(window._relationsGraph);
+    canvas.style.cursor = "default";
+    return;
+  }
+
+  const nodeMap = new Map();
+  for (const n of nodes || []) {
+    if (n && n.id) nodeMap.set(n.id, n);
+  }
+  for (const e of edges) {
+    if (!nodeMap.has(e.source)) {
+      nodeMap.set(e.source, {
+        id: e.source,
+        label: e.source_label || e.source,
+        occurrences: e.count || 1,
+        bias: "neutral",
+        degree: 1,
+      });
+    }
+    if (!nodeMap.has(e.target)) {
+      nodeMap.set(e.target, {
+        id: e.target,
+        label: e.target_label || e.target,
+        occurrences: e.count || 1,
+        bias: "neutral",
+        degree: 1,
+      });
+    }
+  }
+
+  const degree = {};
+  for (const e of edges) {
+    degree[e.source] = (degree[e.source] || 0) + 1;
+    degree[e.target] = (degree[e.target] || 0) + 1;
+  }
+  const rankedIds = [...nodeMap.keys()].sort((a, b) => (degree[b] || 0) - (degree[a] || 0));
+  const keep = new Set(rankedIds.slice(0, 22));
+  const visibleEdges = edges.filter((e) => keep.has(e.source) && keep.has(e.target)).slice(0, 45);
+  const ids = [...keep].filter((id) => visibleEdges.some((e) => e.source === id || e.target === id));
+  if (!ids.length) {
+    window._relationsGraph = {
+      canvas,
+      empty: false,
+      ids: [],
+      pos: {},
+      visibleEdges: [],
+      nodeMap,
+      radii: {},
+      degree,
+      maxCount: 1,
+      hoverId: null,
+      dragId: null,
+      dragOffset: { x: 0, y: 0 },
+      fingerprint: `${window._relationsFilter || "all"}|none`,
+    };
+    _bindRelationsGraphInteractions(window._relationsGraph);
+    _paintRelationsGraph(window._relationsGraph);
+    _updateRelationsGraphHint(window._relationsGraph);
+    canvas.style.cursor = "default";
+    return;
+  }
+  const fingerprint = `${window._relationsFilter || "all"}|${ids.slice().sort().join(",")}|${visibleEdges.length}`;
+
+  const prev = window._relationsGraph;
+  const canReuse =
+    prev &&
+    !prev.empty &&
+    prev.fingerprint === fingerprint &&
+    prev.pos &&
+    ids.every((id) => prev.pos[id]);
+
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = Math.min(w, h) * 0.36;
+  let pos = {};
+
+  if (canReuse) {
+    pos = { ...prev.pos };
+    for (const id of ids) {
+      if (!pos[id]) {
+        const i = ids.indexOf(id);
+        const ang = (Math.PI * 2 * i) / Math.max(ids.length, 1) - Math.PI / 2;
+        pos[id] = { x: cx + Math.cos(ang) * radius, y: cy + Math.sin(ang) * radius };
+      }
+    }
+  } else {
+    ids.forEach((id, i) => {
+      const ang = (Math.PI * 2 * i) / Math.max(ids.length, 1) - Math.PI / 2;
+      pos[id] = { x: cx + Math.cos(ang) * radius, y: cy + Math.sin(ang) * radius };
+    });
+    for (let iter = 0; iter < 40; iter++) {
+      for (const e of visibleEdges) {
+        const a = pos[e.source];
+        const b = pos[e.target];
+        if (!a || !b) continue;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const ideal = 90 + Math.min(80, (e.count || 1) * 0.02);
+        const f = (dist - ideal) * 0.015;
+        const ux = dx / dist;
+        const uy = dy / dist;
+        a.x += ux * f;
+        a.y += uy * f;
+        b.x -= ux * f;
+        b.y -= uy * f;
+      }
+      for (const id of ids) {
+        const p = pos[id];
+        p.x += (cx - p.x) * 0.01;
+        p.y += (cy - p.y) * 0.01;
+        p.x = Math.max(36, Math.min(w - 36, p.x));
+        p.y = Math.max(28, Math.min(h - 28, p.y));
+      }
+    }
+  }
+
+  const maxOcc = Math.max(...ids.map((id) => (nodeMap.get(id)?.occurrences) || 1), 1);
+  const radii = {};
+  for (const id of ids) {
+    const occ = nodeMap.get(id)?.occurrences || 1;
+    radii[id] = 7 + 10 * Math.sqrt(occ / maxOcc);
+  }
+  const maxCount = Math.max(...visibleEdges.map((e) => e.count || 1), 1);
+
+  const state = {
+    canvas,
+    empty: false,
+    ids,
+    pos,
+    visibleEdges,
+    nodeMap,
+    radii,
+    degree,
+    maxCount,
+    hoverId: canReuse ? prev.hoverId : null,
+    dragId: null,
+    dragOffset: { x: 0, y: 0 },
+    fingerprint,
+  };
+  window._relationsGraph = state;
+  _bindRelationsGraphInteractions(state);
+  _paintRelationsGraph(state);
+  _updateRelationsGraphHint(state);
+  canvas.style.cursor = state.hoverId ? "grab" : "default";
+}
+
 function renderPatterns(p) {
   const s = p.structure || {};
   const bias = p.bias_label || "محايد";
@@ -1614,21 +2673,7 @@ function renderPatterns(p) {
     $("#validation-summary").textContent =
       `مقيّم: ${v.count ?? 0} · معتمد: ${v.approved ?? 0} · مرفوض: ${v.rejected ?? 0}`;
   }
-  if ($("#relations-summary")) {
-    const rel = p.relations || {};
-    $("#relations-summary").textContent = rel.summary || "لا علاقات بعد — شغّل الاستكشاف";
-  }
-  if ($("#relations-body")) {
-    const edges = (p.relations && p.relations.edges) || [];
-    $("#relations-body").innerHTML = edges.length
-      ? edges.slice(0, 20).map((e) => `<tr>
-          <td>${e.source}</td>
-          <td>${e.relation}</td>
-          <td>${e.target}</td>
-          <td>${e.count ?? 0}</td>
-        </tr>`).join("")
-      : `<tr><td colspan="4">—</td></tr>`;
-  }
+  renderRelationsPanel(p.relations || {});
 
   const top = kb.top || [];
   if ($("#knowledge-body")) {
@@ -1798,7 +2843,11 @@ function renderAuto(a, models) {
     ["الوضع", a.mode || "paper"],
     ["الرمز", a.symbol || "XAUUSD"],
     ["الأطر الزمنية", tfLabel],
-    ["قرار الأطر", (tfs.length > 1) ? `دمج متعدد (${a.fusion_mode || "weighted_consensus"})` : "إطار واحد · نموذج مدرّب"],
+    ["قرار الأطر", (tfs.length > 1)
+      ? ((a.fusion_mode === "independent")
+          ? "مستقل لكل إطار (تحليل وقرار منفصل)"
+          : `دمج متعدد (${a.fusion_mode || "weighted_consensus"})`)
+      : "إطار واحد · نموذج مدرّب"],
     ["الفاصل", `${a.interval_seconds || 60} ثانية`],
     ["عدد الدورات", a.cycles ?? 0],
     ["الإشارات", a.signals ?? 0],
@@ -1863,8 +2912,10 @@ function renderDecision(payload) {
   const attn = dbg.attention_by_timeframe || {};
   const fusion = dbg.multi_tf_fusion || {};
   const votes = dbg.votes || fusion.votes || [];
+  const independent = dbg.multi_tf_mode === "independent" || d.model_type === "per_tf";
   const topTf = Object.entries(attn).sort((a, b) => Number(b[1]) - Number(a[1]))[0]?.[0]
     || fusion.execution_tf
+    || d.timeframe
     || "—";
   const side = d.pred > 0 ? "BUY" : d.pred < 0 ? "SELL" : "HOLD";
   const voteTxt = votes.length
@@ -1874,23 +2925,31 @@ function renderDecision(payload) {
         return `${v.tf}:${s}(${fmt(v.conf, 2)})`;
       }).join(" · ")
     : "—";
-  $("#decision-table").innerHTML = kvRows([
+  const rows = [
     ["الوقت", fmtTs(d.ts)],
     ["نوع النموذج", d.model_type || "—"],
     ["نسخة النموذج", d.model_version || "—"],
     ["إطار النموذج", d.model_timeframe || d.timeframe || "—"],
     ["الأطر المحلَّلة", (d.timeframes || []).join(" · ") || (d.timeframe || "—")],
+    ["وضع القرار", independent ? "مستقل لهذا الإطار" : (fusion.reason ? "دمج متعدد" : "—")],
     ["القرار", side],
-    ["الثقة المدمجة", fmt(d.confidence, 3)],
+    [independent ? "الثقة" : "الثقة المدمجة", fmt(d.confidence, 3)],
     ["السعر", fmt(d.close, 2)],
     ["سبب القرار", dbg.reason || fusion.reason || "—"],
-    ["أصوات الأطر", voteTxt],
-    ["شراء/بيع/انتظار", `${fusion.buy_votes ?? "—"} / ${fusion.sell_votes ?? "—"} / ${fusion.flat_votes ?? "—"}`],
-    ["أكثر إطار مؤثر", topTf],
+  ];
+  if (!independent) {
+    rows.push(
+      ["أصوات الأطر", voteTxt],
+      ["شراء/بيع/انتظار", `${fusion.buy_votes ?? "—"} / ${fusion.sell_votes ?? "—"} / ${fusion.flat_votes ?? "—"}`],
+      ["أكثر إطار مؤثر", topTf],
+    );
+  }
+  rows.push(
     ["السيناريوهات", `بيع ${fmt(probs.sell, 3)} · انتظار ${fmt(probs.hold, 3)} · شراء ${fmt(probs.buy, 3)}`],
     ["العائد المتوقع", fmt(dbg.expected_return, 4)],
     ["مخاطر النموذج", fmt(dbg.risk_score, 3)],
-  ]);
+  );
+  $("#decision-table").innerHTML = kvRows(rows);
 }
 
 function renderTrades(trades) {
@@ -1911,6 +2970,80 @@ function renderTrades(trades) {
         </tr>`;
       }).join("")
     : `<tr><td colspan="8">لا صفقات بعد — Demo يرسل أوامر إلى MT5 · Paper يسجّل هنا فقط</td></tr>`;
+}
+
+function sideLabel(side) {
+  if (side === "buy") return "شراء";
+  if (side === "sell") return "بيع";
+  return side || "—";
+}
+
+function renderPositions(payload) {
+  const body = $("#positions-body");
+  const summary = $("#positions-summary");
+  const rows = payload?.positions || [];
+  const total = Number(payload?.total_pnl || 0);
+  const winners = Number(payload?.winners || 0);
+  const losers = Number(payload?.losers || 0);
+  if (summary) {
+    if (!rows.length) {
+      summary.textContent = "لا صفقات مفتوحة حالياً";
+    } else {
+      const pnlClass = total > 0 ? "num-ok" : total < 0 ? "num-bad" : "";
+      summary.innerHTML =
+        `${rows.length} صفقة مفتوحة · رابحة ${winners} · خاسرة ${losers} · صافي ` +
+        `<span class="${pnlClass}">${fmt(total, 2)}</span>`;
+    }
+  }
+  ["btn-close-winners", "btn-close-losers", "btn-close-all"].forEach((id) => {
+    const btn = $(`#${id}`);
+    if (btn) btn.disabled = !rows.length;
+  });
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="9">لا صفقات مفتوحة — تظهر هنا صفقات MT5 الخاصة بـ ATIS مع زر إغلاق لكل صفقة</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map((p) => {
+    const net = Number(p.net_profit ?? p.profit ?? 0);
+    const pnlClass = net > 0 ? "num-ok" : net < 0 ? "num-bad" : "";
+    const sideClass = p.side === "buy" ? "side-buy" : p.side === "sell" ? "side-sell" : "";
+    return `<tr data-ticket="${p.ticket}">
+      <td>#${p.ticket}</td>
+      <td class="${sideClass}">${sideLabel(p.side)}</td>
+      <td>${fmt(p.volume, 2)}</td>
+      <td>${fmt(p.price_open, 2)}</td>
+      <td>${fmt(p.price_current, 2)}</td>
+      <td>${fmt(p.sl, 2)}</td>
+      <td>${fmt(p.tp, 2)}</td>
+      <td class="${pnlClass}">${fmt(net, 2)}</td>
+      <td><button class="btn btn-sm danger btn-close-one" type="button" data-close-ticket="${p.ticket}">إغلاق</button></td>
+    </tr>`;
+  }).join("");
+}
+
+async function refreshPositions() {
+  try {
+    const data = await api("/api/positions");
+    renderPositions(data);
+    return data;
+  } catch (e) {
+    renderPositions({ positions: [], total_pnl: 0, winners: 0, losers: 0 });
+    throw e;
+  }
+}
+
+async function closePositions({ ticket = null, mode = null, confirmMsg = "" } = {}) {
+  if (confirmMsg && !window.confirm(confirmMsg)) return null;
+  const body = ticket != null ? { ticket: Number(ticket) } : { mode };
+  const result = await api("/api/positions/close", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  await refreshPositions();
+  const trades = await api("/api/trades?limit=50").catch(() => ({ trades: [] }));
+  renderTrades(trades.trades || []);
+  return result;
 }
 
 function renderJobs(list) {
@@ -2011,6 +3144,7 @@ async function refresh(patternTf) {
   const trainingP = api("/api/training/details");
   const modelsP = api("/api/models");
   const tradesP = api("/api/trades");
+  const positionsP = apiOptional("/api/positions", { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 });
   const decisionP = apiOptional("/api/decision/latest", { empty: true });
   const patternFilesP = apiOptional("/api/patterns/files", { files: [] });
 
@@ -2020,6 +3154,7 @@ async function refresh(patternTf) {
   let coverage = { coverage: [], state_files: [], registry_root: "data/registry/" };
   let patterns = emptyPatterns;
   let trades = { trades: [] };
+  let positions = { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 };
   let decision = { empty: true };
 
   const paintTraining = () => {
@@ -2066,12 +3201,13 @@ async function refresh(patternTf) {
     trainingP,
     modelsP,
     tradesP,
+    positionsP,
     decisionP,
     patternFilesP,
     trainingPaint,
     overviewPaint,
   ]);
-  const [overviewRes, coverageRes, patternsRes, trainingRes, modelsRes, tradesRes, decisionRes, patternFilesRes] = results;
+  const [overviewRes, coverageRes, patternsRes, trainingRes, modelsRes, tradesRes, positionsRes, decisionRes, patternFilesRes] = results;
 
   overview = settledValue(overviewRes, overview);
   coverage = settledValue(coverageRes, coverage);
@@ -2080,6 +3216,7 @@ async function refresh(patternTf) {
   models = settledValue(modelsRes, models);
   _latestModels = models;
   trades = settledValue(tradesRes, { trades: [] });
+  positions = settledValue(positionsRes, { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 });
   decision = settledValue(decisionRes, { empty: true });
   const patternFiles = settledValue(patternFilesRes, { files: [] });
 
@@ -2095,6 +3232,7 @@ async function refresh(patternTf) {
   if (overview.live_settings) applyLiveSettingsForm(overview.live_settings);
   renderAuto(overview.autotrader, models);
   renderDecision(decision);
+  renderPositions(positions);
   renderTrades(trades.trades || []);
   renderJobs(overview.jobs || []);
 
@@ -2106,7 +3244,7 @@ async function refresh(patternTf) {
 
   $("#nav-foot").textContent = `آخر تحديث ${new Date().toLocaleTimeString()}\n${overview.symbol || "XAUUSD"}/${overview.timeframe || "M5"}`;
 
-  const failures = results.slice(0, 8).filter((r) => r.status === "rejected");
+  const failures = results.slice(0, 9).filter((r) => r.status === "rejected");
   if (failures.length) {
     console.warn("Partial refresh failures", failures);
   }
@@ -2252,6 +3390,30 @@ async function startPatternDiscovery(timeframes, label) {
 function bind() {
   $$(".nav-btn").forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+  const cardsHost = $("#current-run-tf-cards");
+  if (cardsHost && !cardsHost._trainTfBound) {
+    cardsHost._trainTfBound = true;
+    cardsHost.addEventListener("change", (ev) => {
+      const input = ev.target.closest('input[name="train-tf"]');
+      if (!input) return;
+      setTrainTfSelected(input.value, input.checked);
+    });
+  }
+  const trainAll = $("#train-tf-all");
+  if (trainAll && !trainAll._bound) {
+    trainAll._bound = true;
+    trainAll.addEventListener("change", () => {
+      const on = trainAll.checked;
+      TRAINABLE_TIMEFRAMES.forEach((tf) => {
+        if (on) _selectedTrainTfs.add(tf);
+        else _selectedTrainTfs.delete(tf);
+      });
+      saveTrainTfSelection();
+      syncTrainTfSelectionUi();
+    });
+  }
+  syncTrainTfSelectionUi();
+
   document.addEventListener("click", (ev) => {
     const sectionBtn = ev.target.closest("[data-view-pattern-section]");
     if (sectionBtn) {
@@ -2285,6 +3447,7 @@ function bind() {
       return;
     }
     if (ev.target.closest("[data-close-modal]")) closeJsonModal();
+    if (ev.target.closest("[data-close-help-modal]")) closeTrainingHelp();
   });
   if ($("#pattern-files-all-tf") && !$("#pattern-files-all-tf")._bound) {
     $("#pattern-files-all-tf")._bound = true;
@@ -2293,7 +3456,9 @@ function bind() {
     });
   }
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape") closeJsonModal();
+    if (ev.key !== "Escape") return;
+    closeJsonModal();
+    closeTrainingHelp();
   });
 
   if ($("#pattern-tf") && !$("#pattern-tf")._bound) {
@@ -2301,6 +3466,46 @@ function bind() {
     $("#pattern-tf").addEventListener("change", () => {
       refresh($("#pattern-tf").value).catch((e) => toast(e.message));
       renderPatternJsonFiles(window._patternJsonFiles || [], $("#pattern-tf").value);
+    });
+  }
+
+  if (!$("#relations-filters")?._bound) {
+    const filters = $("#relations-filters");
+    if (filters) {
+      filters._bound = true;
+      filters.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("[data-rel-filter]");
+        if (!btn) return;
+        window._relationsFilter = btn.dataset.relFilter || "all";
+        renderRelationsPanel(window._relationsData || {});
+      });
+    }
+  }
+
+  const btnRelRebuild = $("#btn-relations-rebuild");
+  if (btnRelRebuild && !btnRelRebuild._bound) {
+    btnRelRebuild._bound = true;
+    btnRelRebuild.addEventListener("click", async () => {
+      const tf = $("#pattern-tf")?.value || "M5";
+      btnRelRebuild.disabled = true;
+      try {
+        toast(`جاري بناء شبكة العلاقات لـ ${tf}…`);
+        const res = await api("/api/patterns/relations/rebuild", {
+          method: "POST",
+          body: JSON.stringify({ timeframes: [tf] }),
+        });
+        const info = (res.timeframes || {})[tf] || {};
+        if (info.empty) {
+          toast(`لم تُستخرج علاقات كافية لـ ${tf}`);
+        } else {
+          toast(`شبكة ${tf}: ${info.edges || 0} حافة · ${info.nodes || 0} عقدة`);
+        }
+        await refresh(tf);
+      } catch (e) {
+        toast(e.message || "تعذر بناء الشبكة");
+      } finally {
+        btnRelRebuild.disabled = false;
+      }
     });
   }
 
@@ -2433,7 +3638,7 @@ function bind() {
         symbol: "XAUUSD",
         timeframe: timeframes[0],
         timeframes,
-        fusion_mode: timeframes.length > 1 ? "weighted_consensus" : undefined,
+        fusion_mode: timeframes.length > 1 ? "independent" : "single",
         interval_seconds: 60,
         cycles: 0,
         signals: 0,
@@ -2444,8 +3649,8 @@ function bind() {
       }, _latestModels || {});
       switchTab("trade");
       toast(mode === "demo"
-        ? `بدأ التداول الآلي Demo · الأوامر تُرسل إلى MT5 · ${timeframes.join(" · ")}`
-        : `بدأ التداول الآلي Paper · تسجيل فقط · ${timeframes.join(" · ")}`);
+        ? `بدأ التداول الآلي Demo · كل إطار بقرار مستقل · ${timeframes.join(" · ")}`
+        : `بدأ التداول الآلي Paper · كل إطار بقرار مستقل · ${timeframes.join(" · ")}`);
 
       const status = await api("/api/autotrade/start", {
         method: "POST",
@@ -2485,12 +3690,109 @@ function bind() {
     } catch (e) { toast(e.message); }
   });
 
+  const bindCloseBtn = (id, mode, confirmMsg) => {
+    const btn = $(`#${id}`);
+    if (!btn || btn._boundClose) return;
+    btn._boundClose = true;
+    btn.addEventListener("click", async () => {
+      try {
+        btn.disabled = true;
+        const result = await closePositions({ mode, confirmMsg });
+        if (!result) return;
+        const n = result.closed_count ?? result.closed?.length ?? 0;
+        toast(n ? `تم إغلاق ${n} صفقة` : "لا صفقات مطابقة للإغلاق");
+      } catch (e) {
+        toast(e.message || "تعذر إغلاق الصفقات");
+      } finally {
+        refreshPositions().catch(() => {});
+      }
+    });
+  };
+  bindCloseBtn("btn-close-winners", "winners", "إغلاق الصفقات الرابحة فقط؟");
+  bindCloseBtn("btn-close-losers", "losers", "إغلاق الصفقات الخاسرة فقط؟");
+  bindCloseBtn("btn-close-all", "all", "إغلاق جميع الصفقات المفتوحة؟");
+
+  const positionsBody = $("#positions-body");
+  if (positionsBody && !positionsBody._boundCloseOne) {
+    positionsBody._boundCloseOne = true;
+    positionsBody.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-close-ticket]");
+      if (!btn) return;
+      const ticket = btn.getAttribute("data-close-ticket");
+      if (!ticket) return;
+      try {
+        btn.disabled = true;
+        const result = await closePositions({
+          ticket,
+          confirmMsg: `إغلاق الصفقة #${ticket}؟`,
+        });
+        if (!result) {
+          btn.disabled = false;
+          return;
+        }
+        toast(`تم إغلاق الصفقة #${ticket}`);
+      } catch (e) {
+        toast(e.message || "تعذر إغلاق الصفقة");
+        btn.disabled = false;
+      }
+    });
+  }
+
   $("#btn-settings-save")?.addEventListener("click", async () => {
     const btn = $("#btn-settings-save");
     try {
       if (btn) btn.disabled = true;
-      await saveLiveSettings();
+      await saveAllSettings();
     } catch (e) {
+      toast(e.message);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  $("#btn-settings-reload")?.addEventListener("click", async () => {
+    try {
+      await loadAllSettings();
+      toast("تم إعادة تحميل الإعدادات");
+    } catch (e) {
+      toast(e.message);
+    }
+  });
+
+  $("#setting-mt5-password")?.addEventListener("focus", () => {
+    const el = $("#setting-mt5-password");
+    if (!el) return;
+    if (!window._mt5PasswordDirty && (el.value === "••••••••" || el.value === "********" || el.value === "")) {
+      el.value = "";
+    }
+  });
+  $("#setting-mt5-password")?.addEventListener("input", () => {
+    window._mt5PasswordDirty = true;
+  });
+
+  $("#btn-mt5-save")?.addEventListener("click", async () => {
+    const btn = $("#btn-mt5-save");
+    try {
+      if (btn) btn.disabled = true;
+      await saveMt5Settings();
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  $("#btn-mt5-test")?.addEventListener("click", async () => {
+    const btn = $("#btn-mt5-test");
+    try {
+      if (btn) btn.disabled = true;
+      await testMt5Settings();
+    } catch (e) {
+      applyMt5ConnectionBanner({
+        ok: false,
+        connection: { ok: false, error: e.message },
+        error: e.message,
+      });
       toast(e.message);
     } finally {
       if (btn) btn.disabled = false;
@@ -2532,14 +3834,19 @@ function bind() {
         else if (kind === "2") await startJob("/api/engines/2/run", { symbols: ["XAUUSD"], timeframes: ["M5"] }, "تنظيف");
         else if (kind === "3") await startJob("/api/engines/3/run", { symbols: ["XAUUSD"], timeframes: ["M1", "M5", "M15", "M30", "H1", "H4", "W1"] }, "إعادة اكتشاف الأنماط");
         else if (kind === "4") {
+          const timeframes = getSelectedTrainTimeframes();
+          if (!timeframes.length) {
+            toast("حدّد إطاراً واحداً على الأقل من صناديق التشغيل الحالي");
+            return;
+          }
           switchTab("train");
           await startJob(
             "/api/engines/4/run",
             {
               symbols: ["XAUUSD"],
-              timeframes: ["M1", "M5", "M15", "M30", "H1", "H4"],
+              timeframes,
             },
-            "تدريب الذهب وإنشاء Final Model",
+            `تدريب الأطر المحددة · ${timeframes.join(" · ")}`,
             { showTrainingProgress: true },
           );
         }
@@ -2557,10 +3864,11 @@ setInterval(() => {
   if (shouldPauseAutoRefresh()) return;
   refresh().catch(() => {});
 }, 15000);
-// Faster pulse while autotrader is active so new trades appear quickly.
+// Faster pulse: open positions always; trades/decision while autotrader runs.
 setInterval(async () => {
   if (shouldPauseAutoRefresh()) return;
   try {
+    await refreshPositions().catch(() => {});
     const st = await api("/api/autotrade/status");
     if (!st?.running) return;
     renderAuto(st, _latestModels || {});

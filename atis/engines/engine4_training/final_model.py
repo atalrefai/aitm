@@ -199,6 +199,17 @@ def publish_final_model(
     metrics = best.get("metrics") or {}
     fin = metrics.get("financial_oos") or {}
     val = metrics.get("financial_validation") or {}
+    readiness = metrics.get("live_readiness") or {}
+    verdict = str(readiness.get("verdict") or "").lower()
+    # Honesty: passed gates ≠ live. Prefer readiness verdict when present.
+    if verdict == "live_ready" and bool(best.get("passed_gates")):
+        mode = "live_ready"
+    elif verdict in {"paper_ready", "research_only", "blocked"}:
+        mode = "paper_only" if verdict == "paper_ready" else verdict
+    elif bool(best.get("passed_gates")):
+        mode = "paper_only"  # gated but readiness unknown → never auto-live
+    else:
+        mode = "paper_only"
     meta = {
         "exists": True,
         "artifact_type": "FinalModel",
@@ -210,7 +221,9 @@ def publish_final_model(
         "artifact_path": str(dst_model),
         "artifact_dir": str(final_dir),
         "passed_gates": bool(best.get("passed_gates")),
-        "mode": "live_ready" if best.get("passed_gates") else "paper_only",
+        "mode": mode,
+        "readiness_verdict": verdict or None,
+        "live_readiness_score": readiness.get("score"),
         "updated_at": _utc(),
         "updated_this_run": True,
         "champion_from_prior_run": False,
@@ -224,6 +237,7 @@ def publish_final_model(
             "horizon_bars": metrics.get("horizon_bars"),
             "n_features": metrics.get("n_features"),
             "n_rows": metrics.get("n_rows"),
+            "live_readiness": readiness,
         },
         "candidates": [
             {

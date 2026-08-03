@@ -260,11 +260,13 @@ class PatternKnowledgeBase:
                     "quality_score": item.get("quality_score"),
                     "strength": item.get("strength"),
                     "approved": item.get("approved"),
+                    "soft_promoted": item.get("soft_promoted"),
                     "bias": item.get("bias"),
                     "best_timeframe": item.get("best_timeframe"),
                     "best_market_regime": item.get("best_market_regime"),
                     "validation": item.get("validation"),
                     "avg_move_after": item.get("avg_move_after") or item.get("avg_forward_return"),
+                    "htf_confirm": item.get("htf_confirm"),
                 }
                 con.execute(
                     """
@@ -423,17 +425,56 @@ class PatternKnowledgeBase:
             rows = con.execute(q, args).fetchall()
         return [dict(r) for r in rows]
 
-    def list_discovered(self, limit: int = 100) -> list[dict[str, Any]]:
+    def list_discovered(
+        self,
+        limit: int = 100,
+        *,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        key_prefix: str | None = None,
+        include_null_lift: bool = True,
+    ) -> list[dict[str, Any]]:
+        """List discovered compounds.
+
+        NewN rows often have ``lift IS NULL``; ordering by lift alone previously
+        pushed them past the LIMIT and dropped their metadata on JSON export.
+        """
+        q = "SELECT * FROM discovered_compounds WHERE 1=1"
+        args: list[Any] = []
+        if symbol:
+            q += " AND (symbol IS NULL OR symbol=?)"
+            args.append(symbol)
+        if timeframe:
+            q += " AND (timeframe IS NULL OR timeframe=?)"
+            args.append(timeframe)
+        if key_prefix:
+            q += " AND compound_key LIKE ?"
+            args.append(f"{key_prefix}%")
+        if include_null_lift:
+            # Prefer real lift, but keep null-lift NewN ahead of the cut-off
+            q += " ORDER BY (lift IS NULL) ASC, lift DESC, occurrences DESC LIMIT ?"
+        else:
+            q += " AND lift IS NOT NULL ORDER BY lift DESC, occurrences DESC LIMIT ?"
+        args.append(limit)
         with self._conn() as con:
-            rows = con.execute(
-                """
-                SELECT * FROM discovered_compounds
-                ORDER BY lift DESC, occurrences DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+            rows = con.execute(q, args).fetchall()
         return [dict(r) for r in rows]
+
+    def list_new_patterns(
+        self,
+        *,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """Return NewN discoveries (lift may be null) without being crowded out."""
+        return self.list_discovered(
+            limit,
+            symbol=symbol,
+            timeframe=timeframe,
+            key_prefix="New",
+            include_null_lift=True,
+        )
 
     def catalog_size(self) -> dict[str, int]:
         with self._conn() as con:
