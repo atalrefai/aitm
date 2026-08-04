@@ -258,14 +258,12 @@ def fuse_multi_tf_votes(
         dbg["reason"] = "majority_tie_or_short"
         return 0, 0.0, dbg
 
-    # weighted_consensus (default)
-    # If the other side has zero directional votes (only HOLD), one TF is enough.
-    effective_need = need
-    if (score > 0 and not sell) or (score < 0 and not buy):
-        effective_need = 1
-    if score > 0 and len(buy) >= effective_need:
+    # weighted_consensus (default): require min_agree directional votes.
+    # Do NOT collapse to 1 when the opposite side is quiet — that made a lone
+    # M15 vote open while other selected TFs were HOLD.
+    if score > 0 and len(buy) >= need:
         return _pick_side(1, buy, sell)
-    if score < 0 and len(sell) >= effective_need:
+    if score < 0 and len(sell) >= need:
         return _pick_side(-1, sell, buy)
     if abs(score) < 1e-12:
         dbg["reason"] = "weighted_flat"

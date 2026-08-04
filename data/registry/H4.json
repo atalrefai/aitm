@@ -1,35 +1,35 @@
 {
   "timeframe": "H4",
-  "updated_at": "2026-08-03T08:03:52.003149+00:00",
+  "updated_at": "2026-08-04T02:51:53.058913+00:00",
   "symbols": {
     "XAUUSD": {
       "raw": {
         "first_available_ts": "2023-07-31T00:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T20:00:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:02:39.831104+00:00",
-        "row_count": 4653,
-        "checksum": "4c576bc4bd2c680bcb31aca583cf18e7",
-        "version_hash": "1a9e9792de874b3a",
+        "last_run_at": "2026-08-04T02:50:51.412732+00:00",
+        "row_count": 4657,
+        "checksum": "af244a71fd9ad5a3256f2c20e912f8cf",
+        "version_hash": "36a3e58100e8ed47",
         "extra_json": "{\"gaps\": [{\"from\": \"2024-12-24T20:00:00+00:00\", \"to\": \"2024-12-26T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}, {\"from\": \"2024-12-31T20:00:00+00:00\", \"to\": \"2025-01-02T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}, {\"from\": \"2025-12-31T20:00:00+00:00\", \"to\": \"2026-01-02T00:00:00+00:00\", \"gap\": \"1 days 04:00:00\"}], \"resolved_symbol\": \"XAUUSD@\"}"
       },
       "clean": {
         "first_available_ts": "2023-07-31T00:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T20:00:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:02:50.208272+00:00",
-        "row_count": 4656,
-        "checksum": "bb09c8108e4e742798fd5d4a05ce6f43",
+        "last_run_at": "2026-08-04T02:50:58.122219+00:00",
+        "row_count": 4660,
+        "checksum": "3aaa24f84604ccf81ed2efaf9767e32d",
         "version_hash": null,
         "extra_json": "{\"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0}"
       },
       "features": {
         "first_available_ts": "2023-07-31T00:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T20:00:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:03:51.985657+00:00",
-        "row_count": 4656,
-        "checksum": "ced7438e9edfbb3d435cb4174a29284d",
+        "last_run_at": "2026-08-04T02:51:53.045896+00:00",
+        "row_count": 4660,
+        "checksum": "094d2e8c9b0a37e07318db689e9a98a6",
         "version_hash": null,
         "extra_json": "{\"feature_count\": 178}"
       }
@@ -1699,6 +1699,30 @@
       "symbol": "XAUUSD",
       "timeframe": "H4",
       "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 1, \"rows_total\": 4656, \"feature_count\": 178, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-08-03T04:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:50:51.417178+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"mode\": \"incremental\", \"rows_fetched\": 6, \"rows_written\": 4, \"rows_total\": 4657, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-08-03T20:00:00+00:00\", \"gaps_detected\": 3, \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:50:58.126336+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4, \"rows_total\": 4660, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-08-03T20:00:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:51:53.049608+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "H4",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"H4\", \"rows_processed\": 4, \"rows_total\": 4660, \"feature_count\": 178, \"first_ts\": \"2023-07-31T00:00:00+00:00\", \"last_ts\": \"2026-08-03T20:00:00+00:00\", \"error\": null}"
     }
   ]
 }

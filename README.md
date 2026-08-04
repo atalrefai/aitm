@@ -32,18 +32,21 @@
 | **المحرك 1** | جلب شموع OHLCV من MT5 (تفاضلي + backfill) |
 | **المحرك 2** | تنظيف البيانات، معالجة الفجوات، تعليم القيم الشاذة |
 | **المحرك 3** | مؤشرات فنية + اكتشاف أنماط + ميزات علائقية |
-| **المحرك 4** | تدريب Walk-Forward، حواجز ثلاثية، HPO مالي، ترويج Champion/Challenger |
-| **المحرك 5** | استدلال حي Paper/Demo مع إدارة مخاطر ومخارج ديناميكية |
-| **الويب** | لوحة Gold Desk مربوطة بكل المحركات والتقارير |
+| **المحرك 4** | تدريب Walk-Forward، حواجز ثلاثية، HPO مالي، ترويج Champion/Challenger، وحقن خبرات RL |
+| **المحرك 5** | استدلال حي Paper/Demo مع إدارة مخاطر ومخارج ديناميكية وبوابة RL حيّة |
+| **التعلّم الحي** | مخزن صفقات تدريب + قاعدة معرفة RL + طابور تغذية راجعة للتدريب |
+| **الويب** | لوحة Gold Desk مربوطة بكل المحركات، مراقب RL، ومراكز MT5 الحية |
 
 ### الحالة الحالية
 
 - [x] البنية التحتية المشتركة (`shared/`, `config/`, السجلات، السجل)
 - [x] المحركات 1–3 لكل الأطر الزمنية المدعومة (عمق التاريخ يعتمد على الوسيط)
-- [x] المحرك 4: Research Factory (v16+) مع بوابات جودة وترويج
-- [x] المحرك 5: Paper/Demo + مخارج ديناميكية + نمط مستقل لكل إطار
+- [x] المحرك 4: Research Factory (v16+) مع بوابات جودة وترويج وميزات RL سياقية
+- [x] المحرك 5: Paper/Demo + مخارج ديناميكية + نمط مستقل لكل إطار + بوابة سياسة RL
 - [x] التركيز على **XAUUSD** في التداول الحي
-- [x] واجهة ويب Gold Desk
+- [x] واجهة ويب Gold Desk مع مراقبة مراكز حية وإغلاق تلقائي
+- [x] تعلّم تعزيزي من نتائج الصفقات الحية مع حفظ الدروس وطابور تدريب
+- [x] مخزن صفقات مغلقة للتدريب مع تدقيق شامل لكل الإغلاقات
 - [x] عرض الأنماط على شارت MT5 عبر Expert Advisor
 
 ### المبادئ التصميمية
@@ -158,19 +161,23 @@ trading AI/
 │   │   ├── pattern_discovery/
 │   │   ├── pattern_store/
 │   │   ├── pattern_kb/
+│   │   ├── rl_learning/            # قاعدة معرفة المكافآت/العقوبات
+│   │   ├── winning_trade_store/    # صفقات التدريب المفتوحة/المغلقة
 │   │   ├── mt5_pattern_overlay/
 │   │   ├── logging_utils/
 │   │   └── …
 │   ├── scripts/
 │   │   ├── ping_mt5.py
 │   │   └── run_pipeline_1_3.py
-│   └── web/                    # Gold Desk (FastAPI + static)
+│   └── web/                    # Gold Desk (FastAPI + static + live position watcher)
 ├── data/
 │   ├── raw/                    # شموع خام
 │   ├── clean/                  # بعد التنظيف
 │   ├── features/               # ميزات جاهزة للتدريب
 │   ├── patterns/
-│   └── registry/               # حالة السلاسل والسجل
+│   ├── registry/               # حالة السلاسل والسجل
+│   ├── rl_knowledge/           # حلقات RL، الدروس، الحالة، طابور التدريب
+│   └── training_trades/        # صفقات مفتوحة + JSONL التدريب + سجل إغلاقات
 ├── models/
 │   ├── XAUUSD/{TF}/            # تجارب + champion / shadow
 │   ├── FinalModel/             # نموذج نهائي اختياري
@@ -298,9 +305,11 @@ python -m atis.engines.engine4_training.run --symbols XAUUSD --timeframes M15 M3
 6. تقييم طيات Walk-Forward + holdouts (أزمة / حديث)
 7. Stress (سبريد، ضوضاء، فجوات، latency)
 8. بوابات: overfitting، استقرار الطيات، PBO، expectancy، readiness
-9. تسجيل Champion أو Shadow Challenger
-10. تقارير: metrics، backtest، diagnosis، enterprise dossier، SHAP/explainability
-11. Research factory board + نصائح إعادة التدريب (drift)
+9. حقن ميزات `feat_rl_*` من حلقات التعلّم الحي وإعادة وزن التسميات
+10. استهلاك طابور خبرات RL المحفوظة بعد كل دورة تدريب
+11. تسجيل Champion أو Shadow Challenger
+12. تقارير: metrics، backtest، diagnosis، enterprise dossier، SHAP/explainability
+13. Research factory board + نصائح إعادة التدريب (drift)
 
 #### مخرجات نموذجية
 
@@ -312,6 +321,7 @@ python -m atis.engines.engine4_training.run --symbols XAUUSD --timeframes M15 M3
 | `models/intelligence/research_factory.json` | لوحة الأبحاث |
 | `models/FinalModel/` | نموذج نهائي عند التفعيل |
 | `logs/training/training_run_report.json` | ملخص تشغيل |
+| `data/rl_knowledge/training_queue.jsonl` | خبرات حيّة محفوظة ستُستهلك في التدريب التالي |
 
 تفاصيل إضافية: `atis/engines/engine4_training/README.md`.
 
@@ -353,6 +363,32 @@ python -m atis.engines.engine5_live_trading.run --symbols XAUUSD --timeframe H1 
 - ليست مستويات تاريخية بعيدة ولا إزاحات ثابتة بالـ pips
 - لتعطيلها: `dynamic_exits.enabled: false` (عودة لمضاعفات ATR الثابتة)
 
+#### التعلم من نتائج التداول الحي
+
+المحرك 5 صار يرسل كل صفقة مغلقة إلى طبقتين:
+
+1. **`winning_trade_store`** لحفظ سجل الصفقات المفتوحة ثم تثبيت الإغلاق النهائي عند تأكد PnL من الوسيط.
+2. **`rl_learning`** لحساب مكافأة/عقوبة مركبة تعتمد على:
+   - نتيجة الصفقة الفعلية (PnL)
+   - جودة قرار الدخول
+   - `RR` المخطط والمحقق
+   - التزام قواعد التنفيذ والفلترة
+
+هذا ينتج:
+
+- `data/training_trades/open_trades.json`
+- `data/training_trades/winning_trades.jsonl`
+- `data/training_trades/closed_trades_audit.jsonl`
+- `data/rl_knowledge/episodes.jsonl`
+- `data/rl_knowledge/learning_timeline.jsonl`
+- `data/rl_knowledge/lessons.json`
+- `data/rl_knowledge/rl_state.json`
+- `data/rl_knowledge/training_queue.jsonl`
+
+#### بوابة RL الحية
+
+عند تفعيل `engine5_live.reinforcement_learning.live_policy_gate_enabled`، يقرأ ATIS أوزان السياسة المتعلمة من الحلقات السابقة، ويمكنه حظر قرار حي إذا كان متوسط الإشارة أدنى من `live_policy_block_threshold`.
+
 #### تعدد الأطر (AutoTrader)
 
 | الإعداد | السلوك |
@@ -389,6 +425,10 @@ web:
 - تشغيل/متابعة المحركات 1–5
 - التقارير والسجلات والنماذج
 - الصفقات والقرارات الحية
+- مراقب التعلم التعزيزي: حلقات، دروس، حالات حفظ المعرفة، وطابور التدريب
+- مراقبة حيّة للمراكز المفتوحة عبر خيط مستقل + بث SSE للواجهة
+- إغلاق يدوي لمركز واحد أو جماعي (`all` / `winners` / `losers`)
+- إغلاق تلقائي للربح أو وقف خسارة مصغّر من الواجهة
 - إيقاف الطوارئ (Kill switch)
 - مساعدة تدريب وتفسيرات الجودة
 
@@ -411,7 +451,7 @@ web:
 | `engine2_cleaning` | الفجوات، الشواذ، المنطقة الزمنية |
 | `engine3_features` | ملف المؤشرات وlookback |
 | `engine4_training` | الحواجز، Walk-Forward، LightGBM، البوابات، HPO، stress |
-| `engine5_live` | Paper/Demo، المخاطر، المخارج، multi-TF، overlay |
+| `engine5_live` | Paper/Demo، المخاطر، المخارج، multi-TF، overlay، RL، winning store |
 | `web` | المضيف والمنفذ |
 | `logging` | المستوى ومجلد السجلات |
 
@@ -446,6 +486,28 @@ engine5_live:
 ```
 
 **تقليل صرامة بوابة معيّنة أثناء البحث (بحذر):** عدّل الأعلام مثل `fail_on_*` في `engine4_training` — لا تعطّلها للتداول الحي دون فهم الأثر.
+
+**تفعيل/ضبط التعلم التعزيزي الحي:**
+
+```yaml
+engine5_live:
+  reinforcement_learning:
+    enabled: true
+    queue_saved_for_training: true
+    live_policy_gate_enabled: true
+    live_policy_block_threshold: -0.2
+```
+
+**تفعيل تخزين الصفقات المغلقة للتدريب:**
+
+```yaml
+engine5_live:
+  winning_trade_store:
+    enabled: true
+    winners_only: false
+    include_losses: true
+    audit_all_closes: true
+```
 
 ---
 
@@ -483,6 +545,8 @@ models/XAUUSD/H1/
 | `logs/training/` | ملخص التدريب |
 | `logs/live/` | قرارات، صفقات، تقرير الحي |
 | `logs/live/mt5_overlay/` | حالة وأنماط الرسم على الشارت |
+| `data/rl_knowledge/` | قاعدة معرفة المكافآت، الحالة، الخط الزمني، الدروس |
+| `data/training_trades/` | الصفقات المفتوحة، صفقات التدريب، سجل الإغلاقات |
 
 ---
 
@@ -529,9 +593,10 @@ engine5_live:
 pytest
 pytest tests/unit -q
 pytest tests/unit/test_engine4_quality_first.py -q
+pytest tests/unit/test_rl_learning.py -q
 ```
 
-تغطي الاختبارات الوحدوية: السجل، الميزات، التنظيف، بوابات المحرك 4، المخارج الديناميكية، نمط overlay، وغيرها تحت `tests/unit/`.
+تغطي الاختبارات الوحدوية: السجل، الميزات، التنظيف، بوابات المحرك 4، المخارج الديناميكية، نمط overlay، وكذلك اختبارات `RL` الخاصة بتقييم الصفقات، تخزين الحلقات، استهلاك طابور التدريب، وإصلاح الحالات التاريخية.
 
 ---
 
@@ -546,7 +611,9 @@ pytest tests/unit/test_engine4_quality_first.py -q
 7. **الأسرار:** لا ترفع `config/secrets.env` أو مفاتيح الحساب.
 8. **الجودة قبل الكمية:** نماذج تفشل البوابات قد تُرفض أو تُبقى في Shadow — راجع `diagnosis.json` و`readiness`.
 9. **إعادة التدريب:** يمكن طلبها عبر إعدادات الحي (`retrain_interval_days` / advisory الانجراف).
-10. **النظام احتمالي:** نتائج الماضي (حتى OOS) لا تضمن الأداء المستقبلي.
+10. **التعلم الحي لا يعني تعلماً فورياً في النموذج:** خبرات RL تُحفظ أولاً ثم تُستهلك في دورة تدريب Engine4 التالية.
+11. **إغلاقات الوسيط الخارجية:** إذا أُغلقت الصفقة عبر SL/TP أو خارج الواجهة، سيحاول `position_watcher` تسويتها من سجل الصفقات في MT5.
+12. **النظام احتمالي:** نتائج الماضي (حتى OOS) لا تضمن الأداء المستقبلي.
 
 ---
 
@@ -578,6 +645,9 @@ python -m atis.engines.engine5_live_trading.run --symbols XAUUSD --timeframe H1 
 
 # واجهة
 python -m atis.web.run
+
+# اختبارات RL
+pytest tests/unit/test_rl_learning.py -q
 
 # اختبارات
 pytest -q

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
@@ -11,7 +12,7 @@ from typing import Any
 import pandas as pd
 import yaml
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -60,6 +61,7 @@ from atis.shared.pattern_store import (
 )
 from atis.web.autotrader import autotrader
 from atis.web.jobs import jobs
+from atis.web.position_watcher import position_watcher
 
 ensure_project_dirs()
 
@@ -78,9 +80,12 @@ async def _lifespan(_app: FastAPI):
         _mt5_keepalive = client
     except Exception:
         _mt5_keepalive = None
+    position_watcher.set_symbol_provider(lambda: _primary()[0])
+    position_watcher.start()
     try:
         yield
     finally:
+        position_watcher.stop()
         autotrader.stop()
         if _mt5_keepalive is not None:
             try:
@@ -318,12 +323,28 @@ class ClosePositionsRequest(BaseModel):
     atis_only: bool = True
 
 
+class AutoCloseSettingsRequest(BaseModel):
+    """Toggle automatic profit/loss exits on open positions."""
+
+    enabled: bool | None = None
+    min_profit: float | None = None
+    loss_enabled: bool | None = None
+    max_loss: float | None = None
+
+
+class DeleteRlEpisodesRequest(BaseModel):
+    episode_ids: list[str] = []
+
+
 class AutoTradeRequest(BaseModel):
     mode: str = "paper"  # paper | demo
     interval_seconds: int = 60
     symbol: str | None = None
     timeframe: str | None = None
     timeframes: list[str] | None = None
+    # When multiple TFs are selected, default is one decision/order per TF.
+    multi_tf_independent: bool | None = True
+    fusion_mode: str | None = None  # independent | weighted_consensus | majority | ...
 
 
 class LiveSettingsRequest(BaseModel):
@@ -1462,27 +1483,349 @@ def trades(limit: int = 100) -> dict[str, Any]:
     return {"trades": rows, "count": len(rows)}
 
 
-@app.get("/api/positions")
-def positions(symbol: str | None = None, atis_only: bool = True) -> dict[str, Any]:
-    """Live open MT5 positions (ATIS magic by default)."""
-    sym = symbol or _primary()[0]
+@app.get("/api/trades/winning")
+def winning_trades(limit: int = 100, symbol: str | None = None, timeframe: str | None = None) -> dict[str, Any]:
+    """Winning closed trades with full pattern details — training corpus."""
     try:
-        with mt5_session() as client:
-            rows = list_open_positions(client, sym, atis_only=atis_only)
+        from atis.shared.winning_trade_store import (
+            load_winning_trades,
+            open_trades_path,
+            winning_trades_path,
+        )
+
+        sym = symbol or _primary()[0]
+        rows = load_winning_trades(symbol=sym, timeframe=timeframe, limit=limit)
+        rows = list(reversed(rows))
+        return {
+            "trades": rows,
+            "count": len(rows),
+            "symbol": sym,
+            "timeframe": timeframe,
+            "path": str(winning_trades_path()),
+            "open_registry": str(open_trades_path()),
+        }
     except Exception as exc:
-        raise HTTPException(503, f"تعذر قراءة الصفقات المفتوحة: {exc}") from exc
-    winners = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) > 0)
-    losers = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) < 0)
-    total_pnl = sum(float(p.get("net_profit", 0) or 0) for p in rows)
-    return {
-        "positions": rows,
-        "count": len(rows),
-        "winners": winners,
-        "losers": losers,
-        "total_pnl": total_pnl,
-        "symbol": sym,
-        "atis_only": atis_only,
-    }
+        raise HTTPException(500, f"تعذر قراءة الصفقات الرابحة: {exc}") from exc
+
+
+@app.get("/api/rl/monitor")
+def rl_monitor(episode_limit: int = 40, timeline_limit: int = 60) -> dict[str, Any]:
+    """Learning Monitor: rewards, penalties, knowledge status, training queue."""
+    try:
+        from atis.shared.rl_learning import get_monitor_snapshot
+
+        return get_monitor_snapshot(
+            episode_limit=max(5, min(int(episode_limit), 200)),
+            timeline_limit=max(5, min(int(timeline_limit), 300)),
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر قراءة مراقب التعلم التعزيزي: {exc}") from exc
+
+
+@app.get("/api/rl/episodes")
+def rl_episodes(
+    page: int = 1,
+    page_size: int = 10,
+    limit: int | None = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    kind: str | None = None,
+    knowledge_status: str | None = None,
+    ticket: str | None = None,
+) -> dict[str, Any]:
+    """Paginated evaluated RL episodes (reward/penalty). Prefer page/page_size."""
+    try:
+        from atis.shared.rl_learning import query_episodes
+
+        # Legacy clients that only pass limit still work (single page).
+        if limit is not None and page_size == 10 and page == 1:
+            page_size = max(1, min(int(limit), 500))
+        result = query_episodes(
+            page=max(1, int(page)),
+            page_size=max(1, min(int(page_size), 100)),
+            symbol=symbol,
+            timeframe=timeframe,
+            kind=kind,
+            knowledge_status=knowledge_status,
+            ticket=ticket,
+        )
+        return {**result, "count": int(result.get("total") or 0)}
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر قراءة حلقات RL: {exc}") from exc
+
+
+@app.post("/api/rl/episodes/delete")
+def rl_episodes_delete(req: DeleteRlEpisodesRequest) -> dict[str, Any]:
+    """Delete one or more evaluated RL episodes by episode_id."""
+    ids = [str(x).strip() for x in (req.episode_ids or []) if str(x).strip()]
+    if not ids:
+        raise HTTPException(400, "لم يُمرَّر أي معرف حلقة للحذف")
+    try:
+        from atis.shared.rl_learning import delete_episodes
+
+        result = delete_episodes(ids)
+        return {"ok": True, **result}
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر حذف حلقات RL: {exc}") from exc
+
+
+def _rl_display_kind(ep: dict[str, Any]) -> str:
+    """Match UI: profit → reward, loss → penalty."""
+    try:
+        net = float(ep.get("net_profit"))
+    except (TypeError, ValueError):
+        net = float("nan")
+    if net == net:  # finite
+        if net > 0:
+            return "reward"
+        if net < 0:
+            return "penalty"
+    if ep.get("is_winner"):
+        return "reward"
+    return str(ep.get("reward_kind") or "neutral")
+
+
+def _rl_kind_ar(kind: str) -> str:
+    if kind == "reward":
+        return "رابحة · مكافأة"
+    if kind == "penalty":
+        return "خاسرة · عقوبة"
+    if kind == "neutral":
+        return "صافي صفر"
+    return kind or "—"
+
+
+def _rl_knowledge_ar(status: str) -> str:
+    if status == "saved":
+        return "تم حفظها"
+    if status == "pending_review":
+        return "قيد المراجعة"
+    if status == "rejected":
+        return "مرفوضة"
+    return status or "—"
+
+
+@app.get("/api/rl/episodes/export")
+def rl_episodes_export(
+    limit: int = 2000,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    kind: str | None = None,
+    knowledge_status: str | None = None,
+) -> StreamingResponse:
+    """Export evaluated RL episodes (reward/penalty) to an Excel workbook."""
+    import io
+    from datetime import datetime, timezone
+
+    try:
+        from atis.shared.rl_learning import load_episodes
+
+        rows = load_episodes(
+            limit=max(1, min(int(limit), 10000)),
+            symbol=symbol,
+            timeframe=timeframe,
+            kind=kind,
+            knowledge_status=knowledge_status,
+        )
+        rows = list(reversed(rows))
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر تصدير حلقات RL: {exc}") from exc
+
+    records: list[dict[str, Any]] = []
+    for e in rows:
+        disp_kind = _rl_display_kind(e)
+        try:
+            reward = float(e.get("reward_total"))
+            reward_pct = round(reward * 100.0, 2) if reward == reward else None
+        except (TypeError, ValueError):
+            reward_pct = None
+        reasons = e.get("reward_reasons") or []
+        lessons = e.get("lessons") or []
+        if not isinstance(reasons, list):
+            reasons = [str(reasons)]
+        if not isinstance(lessons, list):
+            lessons = [str(lessons)]
+        records.append(
+            {
+                "الوقت": e.get("evaluated_at") or "",
+                "التذكرة": e.get("ticket") if e.get("ticket") is not None else "",
+                "الرمز": e.get("symbol") or "",
+                "الإطار": e.get("timeframe") or "",
+                "الاتجاه": e.get("side") or "",
+                "النتيجة (صافي)": e.get("net_profit"),
+                "النوع": _rl_kind_ar(disp_kind),
+                "القيمة %": reward_pct,
+                "السبب": " · ".join(str(x) for x in reasons if x),
+                "التأثير على النموذج": e.get("impact_hint") or "",
+                "الدروس": " · ".join(str(x) for x in lessons if x),
+                "حالة المعرفة": _rl_knowledge_ar(str(e.get("knowledge_status") or "")),
+                "للتدريب": "نعم" if e.get("added_to_training_kb") else "لا",
+                "سبب الإغلاق": e.get("close_reason") or "",
+            }
+        )
+
+    df = pd.DataFrame(records)
+    buf = io.BytesIO()
+    try:
+        from openpyxl.styles import Alignment
+        from openpyxl.utils import get_column_letter
+
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="الصفقات المقيّمة")
+            ws = writer.sheets["الصفقات المقيّمة"]
+            # Widen text columns so full content is readable in Excel.
+            widths = {
+                "الوقت": 22,
+                "التذكرة": 12,
+                "الرمز": 10,
+                "الإطار": 8,
+                "الاتجاه": 8,
+                "النتيجة (صافي)": 14,
+                "النوع": 16,
+                "القيمة %": 10,
+                "السبب": 55,
+                "التأثير على النموذج": 40,
+                "الدروس": 45,
+                "حالة المعرفة": 14,
+                "للتدريب": 10,
+                "سبب الإغلاق": 18,
+            }
+            wrap = Alignment(wrap_text=True, vertical="top")
+            for idx, col in enumerate(df.columns, start=1):
+                letter = get_column_letter(idx)
+                ws.column_dimensions[letter].width = float(widths.get(str(col), 14))
+                for cell in ws[letter]:
+                    cell.alignment = wrap
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر إنشاء ملف Excel: {exc}") from exc
+
+    buf.seek(0)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"rl_evaluated_trades_{stamp}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/rl/training-queue")
+def rl_training_queue(limit: int = 100) -> dict[str, Any]:
+    try:
+        from atis.shared.rl_learning import episodes_pending_for_training
+
+        rows = episodes_pending_for_training(limit=max(1, min(int(limit), 500)))
+        return {
+            "pending": list(reversed(rows)),
+            "count": len(rows),
+            "note": "خبرات محفوظة ستُحقن كسياق في دورة التدريب التالية (Engine4)",
+        }
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر قراءة طابور تدريب RL: {exc}") from exc
+
+
+@app.post("/api/rl/repair")
+def rl_repair() -> dict[str, Any]:
+    """Re-score stored RL episodes so winners are never shown as penalties."""
+    try:
+        from atis.shared.rl_learning import get_monitor_snapshot, repair_episodes
+
+        result = repair_episodes(force=True)
+        snap = get_monitor_snapshot(episode_limit=5, timeline_limit=5)
+        return {"ok": True, "repair": result, "counts": snap.get("counts")}
+    except Exception as exc:
+        raise HTTPException(500, f"تعذر إصلاح حلقات RL: {exc}") from exc
+
+
+@app.get("/api/positions")
+def positions(
+    symbol: str | None = None,
+    atis_only: bool = True,
+    live: bool = False,
+) -> dict[str, Any]:
+    """Open MT5 positions from the watcher cache (instant). Use live=1 to force poll."""
+    sym = symbol or _primary()[0]
+    # Non-default filters go direct to MT5; default path uses the watcher thread.
+    if symbol is not None or atis_only is False:
+        try:
+            with mt5_session() as client:
+                rows = list_open_positions(client, sym, atis_only=atis_only)
+        except Exception as exc:
+            raise HTTPException(503, f"تعذر قراءة الصفقات المفتوحة: {exc}") from exc
+        winners = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) > 0)
+        losers = sum(1 for p in rows if float(p.get("net_profit", 0) or 0) < 0)
+        total_pnl = sum(float(p.get("net_profit", 0) or 0) for p in rows)
+        return {
+            "positions": rows,
+            "count": len(rows),
+            "winners": winners,
+            "losers": losers,
+            "total_pnl": total_pnl,
+            "symbol": sym,
+            "atis_only": atis_only,
+            "source": "live",
+        }
+    if live:
+        return position_watcher.refresh_now()
+    snap = position_watcher.snapshot()
+    if snap.get("updated_at") is None:
+        return position_watcher.refresh_now()
+    if snap.get("error") and not snap.get("positions"):
+        raise HTTPException(503, f"تعذر قراءة الصفقات المفتوحة: {snap['error']}")
+    return snap
+
+
+@app.get("/api/positions/stream")
+async def positions_stream() -> StreamingResponse:
+    """SSE push of open-position snapshots from the watcher thread."""
+
+    async def _events():
+        last_seq = -1
+        while True:
+            snap = position_watcher.snapshot()
+            seq = int(snap.get("seq", 0) or 0)
+            if seq != last_seq:
+                last_seq = seq
+                yield f"data: {json.dumps(snap, ensure_ascii=False, default=str)}\n\n"
+            await asyncio.sleep(0.15)
+
+    return StreamingResponse(
+        _events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/positions/auto-close")
+def positions_auto_close_get() -> dict[str, Any]:
+    """Current auto-close settings for open positions."""
+    return {"ok": True, **position_watcher.auto_close_settings()}
+
+
+@app.post("/api/positions/auto-close")
+def positions_auto_close_set(req: AutoCloseSettingsRequest) -> dict[str, Any]:
+    """Enable/disable auto-close and optionally set profit/loss thresholds."""
+    if (
+        req.enabled is None
+        and req.min_profit is None
+        and req.loss_enabled is None
+        and req.max_loss is None
+    ):
+        raise HTTPException(400, "حدّد enabled و/أو min_profit و/أو loss_enabled و/أو max_loss")
+    try:
+        settings = position_watcher.set_auto_close(
+            enabled=req.enabled,
+            min_profit=req.min_profit,
+            loss_enabled=req.loss_enabled,
+            max_loss=req.max_loss,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, **settings}
 
 
 @app.post("/api/positions/close")
@@ -1503,6 +1846,7 @@ def positions_close(req: ClosePositionsRequest) -> dict[str, Any]:
                         400,
                         f"فشل إغلاق الصفقة #{req.ticket}: retcode={result.get('retcode')} {result.get('comment')}",
                     )
+                position_watcher.refresh_now()
                 return {"ok": True, "closed_count": 1, "closed": [result], "failed": [], "mode": "ticket"}
             assert mode is not None
             if mode not in {"all", "winners", "losers"}:
@@ -1515,6 +1859,7 @@ def positions_close(req: ClosePositionsRequest) -> dict[str, Any]:
             )
             if result["matched"] and result["failed_count"] and not result["closed_count"]:
                 raise HTTPException(400, f"فشل إغلاق الصفقات ({mode})")
+            position_watcher.refresh_now()
             return result
     except HTTPException:
         raise
@@ -1623,12 +1968,20 @@ def autotrade_start(req: AutoTradeRequest) -> dict[str, Any]:
             tfs = [req.timeframe]
         if not tfs:
             tfs = [tf]
+        fusion_mode = req.fusion_mode
+        independent = req.multi_tf_independent
+        if fusion_mode is None and independent is None and len(tfs) > 1:
+            # UI multi-select ⇒ each TF trades with its own model (not fused).
+            independent = True
+            fusion_mode = "independent"
         return autotrader.start(
             mode=req.mode,
             interval_seconds=req.interval_seconds,
             symbol=req.symbol or symbol,
             timeframe=tfs[0],
             timeframes=tfs,
+            multi_tf_independent=independent,
+            fusion_mode=fusion_mode,
         )
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc

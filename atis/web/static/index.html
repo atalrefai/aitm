@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260803c" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260804a" />
 </head>
 <body>
   <header class="shell-top">
@@ -176,10 +176,43 @@
         <div class="page-head" style="margin-top:1.25rem">
           <div>
             <h2 style="margin:0;font-size:1.15rem">تفاصيل الإطار المحدد</h2>
-            <p class="page-desc">اختر إطاراً من المصفوفة لعرض تفاصيل التدريب والاختبار</p>
+            <p class="page-desc">اختر إطاراً أو أكثر لعرض التفاصيل، وعند التحديد المتعدد ستظهر مقارنة مباشرة</p>
           </div>
-          <select id="tf-select" class="btn" style="min-width:120px"></select>
+          <div class="train-detail-selector">
+            <div id="tf-checks" class="auto-tf-grid"></div>
+            <p class="card-note" id="tf-compare-note" style="margin:0">اختر إطاراً واحداً على الأقل</p>
+          </div>
         </div>
+
+        <article class="card" id="tf-compare-panel" style="margin-bottom:1rem" hidden>
+          <div class="card-head-row">
+            <h2>مقارنة الأطر المحددة</h2>
+            <span class="chip" id="tf-compare-count">0 أطر</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الإطار</th>
+                  <th>الحالة</th>
+                  <th>الصفوف</th>
+                  <th>Accuracy</th>
+                  <th>AUC</th>
+                  <th>Val Sharpe</th>
+                  <th>Test Sharpe</th>
+                  <th>Sortino</th>
+                  <th>Max DD</th>
+                  <th>Win Rate</th>
+                  <th>Return</th>
+                  <th>الميزات</th>
+                </tr>
+              </thead>
+              <tbody id="tf-compare-body">
+                <tr><td colspan="12" class="muted">اختر إطارين أو أكثر لعرض المقارنة</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
 
         <div class="grid-2">
           <article class="card">
@@ -729,13 +762,6 @@
             <button class="btn" data-run="5-demo" type="button">دورة Demo واحدةحدة</button>
           </div>
         </div>
-        <div id="auto-running-banner" class="auto-running-banner" hidden>
-          <span class="auto-pulse" aria-hidden="true"></span>
-          <div>
-            <strong id="auto-running-title">التداول الآلي يعمل الآن</strong>
-            <p id="auto-running-meta">—</p>
-          </div>
-        </div>
         <article class="card" style="margin-bottom:1rem">
           <div class="card-head-row">
             <h2>الأطر الزمنية للتداول</h2>
@@ -746,12 +772,12 @@
           </div>
           <p class="card-note">اختر إطاراً أو أكثر — كل إطار يستخدم نموذجه المدرّب (FinalModel / Champion) ويحلّل بياناته ويتخذ قراره وينفّذ بشكل منفصل عن باقي الأطر</p>
           <div class="auto-tf-grid" id="auto-tf-checks">
-            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M1" /> M1</label>
-            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M5" /> M5</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M1" data-blocked="1" disabled title="موقوف مؤقتاً بسبب خسائر مرتفعة" /> M1</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M5" checked /> M5</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M15" checked /> M15</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="M30" checked /> M30</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="H1" checked /> H1</label>
-            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="H4" checked /> H4</label>
+            <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="H4" /> H4</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="D1" /> D1</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="W1" /> W1</label>
             <label class="auto-tf-check"><input type="checkbox" name="auto-tf" value="MN1" /> MN1</label>
@@ -773,8 +799,43 @@
         </article>
         <article class="card" style="margin-top:1rem">
           <div class="card-head-row">
-            <h2>الصفقات المفتوحة</h2>
+            <div>
+              <h2>الصفقات المفتوحة <span class="live-chip" id="positions-live-chip" title="مراقبة حية عبر خيط مستقل">LIVE</span></h2>
+              <p class="card-note" id="positions-live-note" style="margin:0.2rem 0 0">تحديث لحظي من خيط مراقبة منفصل — لا يتأثر بالتدريب أو التحديث العام</p>
+            </div>
             <div class="btn-row positions-actions">
+              <label class="auto-close-toggle" title="إغلاق الصفقة تلقائياً عند تجاوز حد الربح">
+                <input type="checkbox" id="auto-close-enabled" />
+                الإغلاق الآلي
+              </label>
+              <label class="auto-close-threshold" for="auto-close-min-profit">
+                حد الربح
+                <input
+                  type="number"
+                  id="auto-close-min-profit"
+                  value="0.30"
+                  step="0.01"
+                  min="0.01"
+                  disabled
+                  title="يغلق الصفقة عندما يصبح الربح أعلى من هذه القيمة"
+                />
+              </label>
+              <label class="auto-close-toggle auto-close-loss" title="إغلاق الصفقة الخاسرة تلقائياً عند تجاوز حد الخسارة">
+                <input type="checkbox" id="auto-close-loss-enabled" />
+                إغلاق الخاسرة
+              </label>
+              <label class="auto-close-threshold" for="auto-close-max-loss">
+                حد الخسارة
+                <input
+                  type="number"
+                  id="auto-close-max-loss"
+                  value="0.30"
+                  step="0.01"
+                  min="0.01"
+                  disabled
+                  title="يغلق الصفقة عندما تصبح الخسارة أكبر من هذه القيمة"
+                />
+              </label>
               <button class="btn" id="btn-close-winners" type="button" title="إغلاق الصفقات الرابحة فقط">إغلاق الرابحة</button>
               <button class="btn" id="btn-close-losers" type="button" title="إغلاق الصفقات الخاسرة فقط">إغلاق الخاسرة</button>
               <button class="btn danger" id="btn-close-all" type="button" title="إغلاق جميع الصفقات المفتوحة">إغلاق الكل</button>
@@ -800,6 +861,127 @@
             </table>
           </div>
         </article>
+        <article class="card rl-monitor-card" style="margin-top:1rem" id="rl-monitor">
+          <div class="card-head-row">
+            <div>
+              <h2>التعلم التعزيزي والمكافآت (Reinforcement Learning &amp; Rewards)</h2>
+              <p class="card-note">مراقبة مباشرة: كيف يقيّم النظام كل صفقة بعد إغلاقها، وكيف تتحول النتائج إلى معرفة قابلة لإعادة الاستخدام في التدريب والاختبار</p>
+            </div>
+            <div class="btn-row">
+              <button class="btn" id="btn-rl-refresh" type="button">تحديث المراقب</button>
+              <button class="btn" id="btn-rl-repair" type="button" title="إعادة تقييم الحلقات القديمة">إصلاح التصنيف</button>
+            </div>
+          </div>
+          <div class="rl-stats-grid" id="rl-stats-grid">
+            <div class="rl-stat"><span>المكافآت</span><strong id="rl-stat-rewards">0</strong></div>
+            <div class="rl-stat penalty"><span>العقوبات</span><strong id="rl-stat-penalties">0</strong></div>
+            <div class="rl-stat"><span>معرفة محفوظة</span><strong id="rl-stat-saved">0</strong></div>
+            <div class="rl-stat warn"><span>قيد المراجعة</span><strong id="rl-stat-pending">0</strong></div>
+            <div class="rl-stat"><span>مرفوضة</span><strong id="rl-stat-rejected">0</strong></div>
+            <div class="rl-stat accent"><span>لطابور التدريب التالي</span><strong id="rl-stat-queue">0</strong></div>
+          </div>
+          <div class="grid-2" style="margin-top:0.85rem">
+            <div>
+              <h3 class="rl-subhead">مؤشرات التعلم التراكمي</h3>
+              <table class="kv"><tbody id="rl-rolling-table"></tbody></table>
+            </div>
+            <div>
+              <h3 class="rl-subhead">أبرز الدروس المستخلصة</h3>
+              <ul class="rl-lessons" id="rl-lessons-list"><li class="muted">لا دروس بعد — أغلق صفقة لتبدأ الحلقة</li></ul>
+            </div>
+          </div>
+          <div class="page-head" style="margin-top:1rem; margin-bottom:0.35rem; align-items:center">
+            <h3 class="rl-subhead" style="margin:0">الصفقات المقيّمة (مكافأة / عقوبة)</h3>
+            <div class="btn-row">
+              <button class="btn" id="btn-rl-export-excel" type="button" title="تصدير الصفقات المقيّمة إلى ملف Excel">تصدير Excel</button>
+            </div>
+          </div>
+          <div class="rl-episodes-toolbar">
+            <div class="rl-episodes-filters btn-row">
+              <input
+                type="search"
+                id="rl-ticket-search"
+                class="settings-input rl-ticket-input"
+                placeholder="بحث برقم التذكرة"
+                inputmode="numeric"
+                autocomplete="off"
+              />
+              <button class="btn btn-sm" id="btn-rl-ticket-search" type="button">بحث</button>
+              <button class="btn btn-sm" id="btn-rl-ticket-clear" type="button">مسح</button>
+              <button class="btn btn-sm danger" id="btn-rl-delete-selected" type="button" disabled>حذف المحدد</button>
+            </div>
+            <div class="rl-pagination" id="rl-episodes-pager" aria-label="ترقيم الصفحات">
+              <button class="btn btn-sm" id="btn-rl-page-prev" type="button" disabled>السابق</button>
+              <span class="rl-page-info" id="rl-page-info">صفحة 1 / 1</span>
+              <button class="btn btn-sm" id="btn-rl-page-next" type="button" disabled>التالي</button>
+            </div>
+          </div>
+          <div class="table-scroll tall">
+            <table class="data rl-episodes-table">
+              <thead>
+                <tr>
+                  <th class="rl-check-col">
+                    <input type="checkbox" id="rl-episodes-select-all" title="تحديد الكل في الصفحة" />
+                  </th>
+                  <th>الوقت</th>
+                  <th>التذكرة</th>
+                  <th>الإطار</th>
+                  <th>النتيجة</th>
+                  <th>النوع</th>
+                  <th>القيمة %</th>
+                  <th>السبب</th>
+                  <th>التأثير على النموذج</th>
+                  <th>الدروس</th>
+                  <th>حالة المعرفة</th>
+                  <th>للتدريب</th>
+                  <th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="rl-episodes-body">
+                <tr><td colspan="13" class="muted">لا حلقات تعلم بعد</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 class="rl-subhead" style="margin-top:1rem">السجل الزمني لعمليات التعلم</h3>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الوقت</th>
+                  <th>الحدث</th>
+                  <th>التذكرة</th>
+                  <th>النوع</th>
+                  <th>المكافأة</th>
+                  <th>حالة المعرفة</th>
+                  <th>تفاصيل</th>
+                </tr>
+              </thead>
+              <tbody id="rl-timeline-body">
+                <tr><td colspan="7" class="muted">لا أحداث بعد</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 class="rl-subhead" style="margin-top:1rem">مساهمة الخبرات في تحسين الأداء بمرور الوقت</h3>
+          <div class="table-scroll">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>الوقت</th>
+                  <th>مكافأة الحلقة</th>
+                  <th>EMA المكافأة</th>
+                  <th>EMA الجودة</th>
+                  <th>EMA معدل الربح</th>
+                </tr>
+              </thead>
+              <tbody id="rl-perf-body">
+                <tr><td colspan="6" class="muted">ستظهر السلسلة بعد أول تقييمات</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="card-note" id="rl-paths-note" style="margin-top:0.75rem"></p>
+        </article>
+
         <article class="card" style="margin-top:1rem">
           <h2>سجل الصفقات</h2>
           <div class="table-scroll">
@@ -809,6 +991,7 @@
             </table>
           </div>
         </article>
+
       </section>
 
       <!-- SETTINGS -->
@@ -863,7 +1046,7 @@
           <div class="card-head-row">
             <h2>شرط السبريد (Bid / Ask)</h2>
             <label class="chip auto-tf-all" id="spread-filter-toggle-wrap">
-              <input type="checkbox" id="setting-use-spread-filter" />
+              <input type="checkbox" id="setting-use-spread-filter" checked />
               تفعيل فلتر السبريد
             </label>
           </div>
@@ -977,6 +1160,6 @@
     </div>
   </div>
   <script src="/static/training_help.js?v=20260803c"></script>
-  <script src="/static/app.js?v=20260803c"></script>
+  <script src="/static/app.js?v=20260804a"></script>
 </body>
 </html>

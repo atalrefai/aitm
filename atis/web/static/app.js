@@ -303,6 +303,9 @@ let _refreshPromise = null;
 let _dataRefreshPromise = null;
 let _latestModels = null;
 let _latestTraining = null;
+let _trainingOverview = null;
+let _selectedDetailTfs = [];
+const _trainingDetailCache = new Map();
 
 const TRAINABLE_TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4"];
 const TRAIN_TF_SELECTION_KEY = "atis.train.selectedTfs";
@@ -346,6 +349,125 @@ function setTrainTfSelected(tf, on) {
   else _selectedTrainTfs.delete(key);
   saveTrainTfSelection();
   syncTrainTfSelectionUi();
+}
+
+function listTrainingTimeframes(training) {
+  const bag = new Set();
+  const add = (value) => {
+    const tf = String(value || "").toUpperCase();
+    if (tf) bag.add(tf);
+  };
+  (training?.all_timeframes || []).forEach(add);
+  (training?.matrix_current_run || []).forEach((row) => add(row?.timeframe));
+  (training?.matrix_champion || training?.matrix || []).forEach((row) => add(row?.timeframe));
+  add(training?.selected_timeframe);
+  add(training?.final_model?.timeframe);
+  add(training?.timeframe);
+  return Array.from(bag);
+}
+
+function normalizeDetailTfSelection(selection, available, fallbackTf = "H1") {
+  const allow = new Set((available || []).map((tf) => String(tf || "").toUpperCase()).filter(Boolean));
+  const picked = [];
+  (selection || []).forEach((tf) => {
+    const key = String(tf || "").toUpperCase();
+    if (allow.has(key) && !picked.includes(key)) picked.push(key);
+  });
+  if (!picked.length) {
+    const fallback = String(fallbackTf || "").toUpperCase();
+    if (allow.has(fallback)) picked.push(fallback);
+    else if (available?.length) picked.push(String(available[0]).toUpperCase());
+  }
+  return picked;
+}
+
+function getOverviewMetricRow(training, tf) {
+  const key = String(tf || "").toUpperCase();
+  const current = (training?.matrix_current_run || []).find((row) => String(row?.timeframe || "").toUpperCase() === key);
+  const champion = (training?.matrix_champion || training?.matrix || []).find((row) => String(row?.timeframe || "").toUpperCase() === key);
+  return current || champion || null;
+}
+
+function getDetailSummaryRow(tf, detail, overview) {
+  const row = getOverviewMetricRow(overview, tf) || {};
+  const metrics = detail?.metrics || {};
+  const cls = metrics.classification || {};
+  const fin = metrics.financial_oos || {};
+  const valFin = metrics.financial_validation || (metrics.validation || {}).financial || {};
+  const dataset = detail?.dataset || {};
+  const status = detail?.empty ? "غير مدرّب" : (detail?.passed_gates ? "اجتاز" : "مرفوض");
+  return {
+    tf,
+    status,
+    rows: metrics.n_rows ?? dataset.n_rows_used ?? dataset.rows ?? row.rows ?? "—",
+    accuracy: cls.accuracy ?? row.accuracy,
+    auc: cls.roc_auc_ovr ?? row.auc,
+    valSharpe: valFin.sharpe ?? row.val_sharpe,
+    testSharpe: fin.sharpe ?? row.sharpe,
+    sortino: fin.sortino ?? row.sortino,
+    maxDrawdown: fin.max_drawdown ?? row.max_drawdown,
+    winRate: fin.win_rate,
+    totalReturn: fin.total_return ?? row.total_return ?? row.sum_trade_returns,
+    features: metrics.n_features ?? dataset.n_features ?? row.n_features ?? "—",
+    hasDetail: Boolean(detail?.metrics?.financial_oos),
+  };
+}
+
+function renderTrainingComparisonPanel(selection, overview) {
+  const panel = $("#tf-compare-panel");
+  const body = $("#tf-compare-body");
+  const count = $("#tf-compare-count");
+  const note = $("#tf-compare-note");
+  if (!panel || !body || !count || !note) return;
+  const picked = selection || [];
+  count.textContent = `${picked.length} ${picked.length === 1 ? "إطار" : "أطر"}`;
+  note.textContent = picked.length > 1
+    ? `مقارنة مباشرة بين ${picked.join(" · ")}`
+    : (picked.length === 1 ? `يعرض التفاصيل الكاملة للإطار ${picked[0]}` : "اختر إطاراً واحداً على الأقل");
+  panel.hidden = picked.length < 2;
+  if (picked.length < 2) {
+    body.innerHTML = `<tr><td colspan="12" class="muted">اختر إطارين أو أكثر لعرض المقارنة</td></tr>`;
+    return;
+  }
+  body.innerHTML = picked.map((tf) => {
+    const detail = _trainingDetailCache.get(tf) || null;
+    const row = getDetailSummaryRow(tf, detail, overview);
+    const returnValue = row.hasDetail ? pct(row.totalReturn, 2) : fmt(row.totalReturn, 4);
+    return `<tr>
+      <td><b>${row.tf}</b></td>
+      <td class="${row.status === "اجتاز" ? "num-ok" : (row.status === "مرفوض" ? "num-bad" : "num-warn")}">${row.status}</td>
+      <td>${row.rows}</td>
+      <td>${fmt(row.accuracy, 3)}</td>
+      <td>${fmt(row.auc, 3)}</td>
+      <td class="${clsNum(row.valSharpe)}">${fmt(row.valSharpe, 2)}</td>
+      <td class="${clsNum(row.testSharpe)}">${fmt(row.testSharpe, 2)}</td>
+      <td class="${clsNum(row.sortino)}">${fmt(row.sortino, 2)}</td>
+      <td class="num-bad">${pct(row.maxDrawdown, 2)}</td>
+      <td>${pct(row.winRate, 2)}</td>
+      <td class="${clsNum(row.totalReturn)}">${returnValue}</td>
+      <td>${row.features}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderTrainingTfChecks(training, selection) {
+  const root = $("#tf-checks");
+  if (!root) return;
+  const picked = new Set(selection || []);
+  const tfs = listTrainingTimeframes(training);
+  root.innerHTML = tfs.map((tf) => `
+    <label class="auto-tf-check train-detail-check${picked.has(tf) ? " is-active" : ""}">
+      <input type="checkbox" name="detail-tf" value="${tf}" ${picked.has(tf) ? "checked" : ""} />
+      ${tf}
+    </label>
+  `).join("");
+  root.querySelectorAll('input[name="detail-tf"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      const values = Array.from(root.querySelectorAll('input[name="detail-tf"]:checked'))
+        .map((el) => String(el.value || "").toUpperCase());
+      updateTrainingDetailSelection(values, training);
+    });
+  });
 }
 
 function syncTrainTfSelectionUi() {
@@ -399,6 +521,130 @@ function hasRunningPatternDiscovery() {
 
 function shouldPauseAutoRefresh() {
   return Boolean(_activeJobs.pipeline) || Boolean(_activeJobs.training) || hasRunningPatternDiscovery();
+}
+
+const TRADE_CARD_COLLAPSE_KEY = "atis.tradeCardCollapse";
+
+function readTradeCardCollapseState() {
+  try {
+    const raw = window.localStorage.getItem(TRADE_CARD_COLLAPSE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeTradeCardCollapseState(state) {
+  try {
+    window.localStorage.setItem(TRADE_CARD_COLLAPSE_KEY, JSON.stringify(state || {}));
+  } catch { /* ignore quota */ }
+}
+
+function setTradeCardCollapsed(card, collapsed) {
+  if (!card) return;
+  card.classList.toggle("is-collapsed", !!collapsed);
+  const btn = card.querySelector(":scope > .card-head-row .btn-card-collapse");
+  if (btn) {
+    const isCollapsed = card.classList.contains("is-collapsed");
+    btn.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    btn.title = isCollapsed ? "تكبير الصندوق" : "تصغير الصندوق";
+    btn.setAttribute("aria-label", isCollapsed ? "تكبير" : "تصغير");
+  }
+  const id = card.dataset.collapseId;
+  if (!id) return;
+  const state = readTradeCardCollapseState();
+  state[id] = !!collapsed;
+  writeTradeCardCollapseState(state);
+}
+
+function ensureTradeCardCollapseButton(head) {
+  let btn = head.querySelector(".btn-card-collapse");
+  if (btn) return btn;
+  btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-sm btn-card-collapse";
+  btn.setAttribute("aria-expanded", "true");
+  btn.title = "تصغير الصندوق";
+  btn.setAttribute("aria-label", "تصغير");
+  btn.innerHTML =
+    '<span class="collapse-icon-min" aria-hidden="true">−</span>' +
+    '<span class="collapse-icon-max" aria-hidden="true">▢</span>';
+
+  const actions = head.querySelector(":scope > .btn-row, :scope > .positions-actions");
+  if (actions) {
+    actions.appendChild(btn);
+    return btn;
+  }
+
+  // Cards with only a chip (timeframes) or bare title: dedicated slot on the left (end in RTL).
+  let slot = head.querySelector(":scope > .card-collapse-slot");
+  if (!slot) {
+    slot = document.createElement("div");
+    slot.className = "card-collapse-slot";
+    head.appendChild(slot);
+  }
+  slot.appendChild(btn);
+  return btn;
+}
+
+/** Add minimize/maximize controls to every card in التداول الآلي. */
+function initTradeCardCollapse() {
+  const tab = $("#tab-trade");
+  if (!tab || tab._collapseReady) return;
+  tab._collapseReady = true;
+  const saved = readTradeCardCollapseState();
+  const cards = Array.from(tab.querySelectorAll("article.card"));
+  cards.forEach((card, index) => {
+    if (card.dataset.collapseReady) return;
+    card.dataset.collapseReady = "1";
+    const id = card.id || `trade-card-${index}`;
+    card.dataset.collapseId = id;
+
+    let head = card.querySelector(":scope > .card-head-row");
+    if (!head) {
+      const h2 = card.querySelector(":scope > h2");
+      head = document.createElement("div");
+      head.className = "card-head-row";
+      if (h2) {
+        card.insertBefore(head, h2);
+        head.appendChild(h2);
+      } else {
+        card.insertBefore(head, card.firstChild);
+      }
+    }
+
+    let body = card.querySelector(":scope > .card-body");
+    if (!body) {
+      body = document.createElement("div");
+      body.className = "card-body";
+      const move = [];
+      let node = head.nextSibling;
+      while (node) {
+        const next = node.nextSibling;
+        if (!(node.nodeType === 1 && node.classList?.contains("card-collapse-slot"))) {
+          move.push(node);
+        }
+        node = next;
+      }
+      move.forEach((n) => body.appendChild(n));
+      card.appendChild(body);
+    }
+
+    const btn = ensureTradeCardCollapseButton(head);
+    if (!btn._boundCollapse) {
+      btn._boundCollapse = true;
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setTradeCardCollapsed(card, !card.classList.contains("is-collapsed"));
+      });
+    }
+
+    if (saved[id]) setTradeCardCollapsed(card, true);
+    else setTradeCardCollapsed(card, false);
+  });
 }
 
 function renderTrainingLogs(logs) {
@@ -1228,6 +1474,9 @@ function switchTab(name) {
   if (name === "settings") {
     loadAllSettings().catch((e) => toast(e.message));
   }
+  if (name === "trade") {
+    refreshRlMonitor().catch(() => {});
+  }
 }
 
 function stageLabelAr(stage) {
@@ -1651,24 +1900,58 @@ function renderCurrentRunPanel(t, liveDetails) {
   syncTrainTfSelectionUi();
 }
 
+async function updateTrainingDetailSelection(selection, training) {
+  const overview = training || _trainingOverview || _latestTraining || {};
+  const available = listTrainingTimeframes(overview);
+  const fallback = overview?.selected_timeframe || overview?.final_model?.timeframe || overview?.timeframe || available[0] || "H1";
+  const picked = normalizeDetailTfSelection(selection, available, fallback);
+  _selectedDetailTfs = picked;
+  renderTrainingTfChecks(overview, picked);
+  renderTrainingComparisonPanel(picked, overview);
+  try {
+    await Promise.all(picked.map(async (tf) => {
+      if (_trainingDetailCache.has(tf)) return;
+      const detail = await api(`/api/training/details?timeframe=${encodeURIComponent(tf)}`);
+      _trainingDetailCache.set(tf, detail);
+    }));
+    const primary = _trainingDetailCache.get(picked[0]);
+    if (primary) {
+      renderTraining(primary);
+      renderTrainingVersions(_latestModels, primary);
+      renderTrainingDashboards(primary, _latestModels);
+    }
+    renderTrainingComparisonPanel(picked, _trainingOverview || overview);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 function renderTraining(t) {
   _latestTraining = t;
+  const hasOverviewMatrix = Boolean(
+    (t.all_timeframes && t.all_timeframes.length)
+    || (t.matrix_current_run && t.matrix_current_run.length)
+    || ((t.matrix_champion || t.matrix) && (t.matrix_champion || t.matrix).length),
+  );
+  if (hasOverviewMatrix) _trainingOverview = t;
+  const overview = hasOverviewMatrix ? t : (_trainingOverview || t);
   const banner = $("#train-banner");
-  const matrix = t.matrix_champion || t.matrix || [];
-  const currentMatrix = t.matrix_current_run || [];
+  const matrix = overview.matrix_champion || overview.matrix || [];
+  const currentMatrix = overview.matrix_current_run || [];
   const summary = t.summary || {};
   const ll = t.llmodel;
-
-  // Fill TF selector
-  const sel = $("#tf-select");
-  const tfs = t.all_timeframes || matrix.map((m) => m.timeframe);
   const selected = t.selected_timeframe || t.final_model?.timeframe || t.timeframe || "H1";
-  if (sel && sel.options.length !== tfs.length) {
-    sel.innerHTML = tfs.map((tf) => `<option value="${tf}">${tf}</option>`).join("");
-  }
-  if (sel) sel.value = selected;
+  _trainingDetailCache.set(String(selected).toUpperCase(), t);
+  const picked = normalizeDetailTfSelection(
+    _selectedDetailTfs.length ? _selectedDetailTfs : [selected],
+    listTrainingTimeframes(overview),
+    selected,
+  );
+  _selectedDetailTfs = picked;
+  renderTrainingTfChecks(overview, picked);
+  renderTrainingComparisonPanel(picked, overview);
 
-  renderCurrentRunPanel(t, _activeJobs.trainingDetails || null);
+  renderCurrentRunPanel(overview, _activeJobs.trainingDetails || null);
   renderTradingIntelligencePanel(t);
 
   // Current-run matrix
@@ -1736,26 +2019,9 @@ function renderTraining(t) {
   $$("[data-select-tf]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const tf = btn.getAttribute("data-select-tf");
-      try {
-        const details = await api(`/api/training/details?timeframe=${tf}`);
-        renderTraining(details);
-        renderTrainingVersions(_latestModels, details);
-        renderTrainingDashboards(details, _latestModels);
-      } catch (e) { toast(e.message); }
+      updateTrainingDetailSelection([tf], overview);
     });
   });
-
-  if (sel && !sel._bound) {
-    sel._bound = true;
-    sel.addEventListener("change", async () => {
-      try {
-        const details = await api(`/api/training/details?timeframe=${sel.value}`);
-        renderTraining(details);
-        renderTrainingVersions(_latestModels, details);
-        renderTrainingDashboards(details, _latestModels);
-      } catch (e) { toast(e.message); }
-    });
-  }
 
   const runPassed = summary.current_run_passed_gates ?? t.last_run?.summary?.passed_gates ?? 0;
   const runTrained = summary.current_run_trained ?? t.last_run?.summary?.trained ?? 0;
@@ -2766,12 +3032,18 @@ function drawPatternChart(ohlc, markers) {
   });
 }
 
+function isAutoTfBlocked(el) {
+  return !!(el && (el.dataset?.blocked === "1" || el.getAttribute("data-blocked") === "1"));
+}
+
 function getSelectedAutoTimeframes() {
-  return $$('#auto-tf-checks input[name="auto-tf"]:checked').map((el) => el.value);
+  return $$('#auto-tf-checks input[name="auto-tf"]:checked')
+    .filter((el) => !isAutoTfBlocked(el))
+    .map((el) => el.value);
 }
 
 function syncAutoTfAllCheckbox() {
-  const boxes = $$('#auto-tf-checks input[name="auto-tf"]');
+  const boxes = $$('#auto-tf-checks input[name="auto-tf"]').filter((el) => !isAutoTfBlocked(el));
   const all = $("#auto-tf-all");
   if (!boxes.length || !all) return;
   const checked = boxes.filter((el) => el.checked).length;
@@ -2782,13 +3054,19 @@ function syncAutoTfAllCheckbox() {
 function setAutoTfChecks(timeframes, { locked = false } = {}) {
   const set = new Set((timeframes || []).map((t) => String(t).toUpperCase()));
   const boxes = $$('#auto-tf-checks input[name="auto-tf"]');
+  // Apply selection first (ignore temporary lock disabled state), then apply lock.
+  // Permanently blocked TFs (data-blocked) stay unchecked and disabled.
   if (set.size) {
     boxes.forEach((el) => {
-      el.checked = set.has(el.value);
+      if (isAutoTfBlocked(el)) {
+        el.checked = false;
+        return;
+      }
+      el.checked = set.has(String(el.value).toUpperCase());
     });
   }
   boxes.forEach((el) => {
-    el.disabled = locked;
+    el.disabled = locked || isAutoTfBlocked(el);
   });
   const all = $("#auto-tf-all");
   if (all) all.disabled = locked;
@@ -2813,16 +3091,6 @@ function renderAuto(a, models) {
     stAuto.className = "";
   }
 
-  const banner = $("#auto-running-banner");
-  if (banner) {
-    banner.hidden = !a.running;
-    if (a.running) {
-      $("#auto-running-title").textContent = `التداول الآلي يعمل الآن · ${a.mode || "paper"}`;
-      $("#auto-running-meta").textContent =
-        `${a.symbol || "XAUUSD"} · الأطر: ${tfLabel} · دورات: ${a.cycles ?? 0} · أوامر: ${a.orders ?? 0}`;
-    }
-  }
-
   $("#btn-auto-start") && ($("#btn-auto-start").disabled = !!a.running);
   $("#btn-auto-start-paper") && ($("#btn-auto-start-paper").disabled = !!a.running);
   $("#btn-auto-stop") && ($("#btn-auto-stop").disabled = !a.running);
@@ -2830,13 +3098,25 @@ function renderAuto(a, models) {
   if (a.running && tfs.length) {
     setAutoTfChecks(tfs, { locked: true });
   } else {
-    $$('#auto-tf-checks input[name="auto-tf"]').forEach((el) => { el.disabled = false; });
+    $$('#auto-tf-checks input[name="auto-tf"]').forEach((el) => {
+      el.disabled = isAutoTfBlocked(el);
+    });
     const allTf = $("#auto-tf-all");
     if (allTf) allTf.disabled = false;
     $("#auto-tf-checks")?.classList.remove("is-locked");
     allTf?.closest(".auto-tf-all")?.classList.remove("is-locked");
     syncAutoTfAllCheckbox();
   }
+
+  const byTf = a.last_reports_by_tf?.by_timeframe || a.last_report?.by_timeframe || {};
+  const byTfRows = Object.keys(byTf).length
+    ? Object.entries(byTf).map(([tf, info]) => {
+        if (info?.error) return [tf, `خطأ: ${info.error}`];
+        const side = Number(info?.pred) > 0 ? "شراء" : Number(info?.pred) < 0 ? "بيع" : "انتظار";
+        const orders = info?.orders ?? 0;
+        return [tf, `${side} · ثقة ${fmt(info?.confidence, 3)} · أوامر ${orders}`];
+      })
+    : [];
 
   $("#auto-table").innerHTML = kvRows([
     ["الحالة", a.running ? "يعمل ✓" : "متوقف"],
@@ -2848,6 +3128,7 @@ function renderAuto(a, models) {
           ? "مستقل لكل إطار (تحليل وقرار منفصل)"
           : `دمج متعدد (${a.fusion_mode || "weighted_consensus"})`)
       : "إطار واحد · نموذج مدرّب"],
+    ...byTfRows,
     ["الفاصل", `${a.interval_seconds || 60} ثانية`],
     ["عدد الدورات", a.cycles ?? 0],
     ["الإشارات", a.signals ?? 0],
@@ -2972,27 +3253,400 @@ function renderTrades(trades) {
     : `<tr><td colspan="8">لا صفقات بعد — Demo يرسل أوامر إلى MT5 · Paper يسجّل هنا فقط</td></tr>`;
 }
 
+function rlKnowledgeLabel(status) {
+  if (status === "saved") return "تم حفظها";
+  if (status === "pending_review") return "قيد المراجعة";
+  if (status === "rejected") return "مرفوضة";
+  return status || "—";
+}
+
+function rlKindLabel(kind) {
+  if (kind === "reward") return "رابحة · مكافأة";
+  if (kind === "penalty") return "خاسرة · عقوبة";
+  if (kind === "neutral") return "صافي صفر";
+  return kind || "—";
+}
+
+/** Strict display: any profit → رابحة, any loss → خاسرة, zero → صافي صفر. */
+function rlDisplayKind(e) {
+  const net = Number(e?.net_profit);
+  if (Number.isFinite(net) && net > 0) return "reward";
+  if (Number.isFinite(net) && net < 0) return "penalty";
+  if (Number.isFinite(net) && net === 0) return "neutral";
+  if (e?.is_winner) return "reward";
+  return e?.reward_kind || e?.kind || "neutral";
+}
+
+function rlTrainLabel(e) {
+  if (e?.added_to_training_kb || e?.knowledge_status === "saved") return "نعم ✓";
+  const net = Number(e?.net_profit);
+  if (Number.isFinite(net) && net > 0 && e?.knowledge_status === "pending_review") {
+    return "مراجعة";
+  }
+  return "لا";
+}
+
+const RL_EPISODES_PAGE_SIZE = 10;
+let _rlEpisodesPage = 1;
+let _rlEpisodesPages = 1;
+let _rlTicketQuery = "";
+let _rlEpisodesLoading = false;
+
+function selectedRlEpisodeIds() {
+  return [...document.querySelectorAll("#rl-episodes-body input.rl-ep-check:checked")]
+    .map((el) => el.getAttribute("data-episode-id") || "")
+    .filter(Boolean);
+}
+
+function syncRlDeleteSelectedBtn() {
+  const btn = $("#btn-rl-delete-selected");
+  if (!btn) return;
+  const n = selectedRlEpisodeIds().length;
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? `حذف المحدد (${n})` : "حذف المحدد";
+}
+
+function updateRlEpisodesPager({ page = 1, pages = 1, total = 0 } = {}) {
+  _rlEpisodesPage = Math.max(1, Number(page) || 1);
+  _rlEpisodesPages = Math.max(1, Number(pages) || 1);
+  const info = $("#rl-page-info");
+  if (info) {
+    info.textContent = total
+      ? `صفحة ${_rlEpisodesPage} / ${_rlEpisodesPages} · ${total} صفقة`
+      : `صفحة ${_rlEpisodesPage} / ${_rlEpisodesPages}`;
+  }
+  const prev = $("#btn-rl-page-prev");
+  const next = $("#btn-rl-page-next");
+  if (prev) prev.disabled = _rlEpisodesPage <= 1 || _rlEpisodesLoading;
+  if (next) next.disabled = _rlEpisodesPage >= _rlEpisodesPages || _rlEpisodesLoading;
+}
+
+function renderRlEpisodesTable(data) {
+  const ebody = $("#rl-episodes-body");
+  if (!ebody) return;
+  const eps = data?.episodes || [];
+  const selectAll = $("#rl-episodes-select-all");
+  if (selectAll) selectAll.checked = false;
+
+  updateRlEpisodesPager({
+    page: data?.page ?? _rlEpisodesPage,
+    pages: data?.pages ?? 1,
+    total: data?.total ?? eps.length,
+  });
+
+  if (!eps.length) {
+    ebody.innerHTML = `<tr><td colspan="13" class="muted">${
+      _rlTicketQuery
+        ? `لا نتائج لرقم التذكرة «${escapeHtml(_rlTicketQuery)}»`
+        : "لا حلقات تعلم بعد — تُسجَّل تلقائياً عند إغلاق أي صفقة"
+    }</td></tr>`;
+    syncRlDeleteSelectedBtn();
+    return;
+  }
+
+  ebody.innerHTML = eps.map((e) => {
+    const reasons = (e.reward_reasons || []).join(" · ");
+    const lessonsTxt = (e.lessons || []).join(" · ");
+    const st = e.knowledge_status || "";
+    const kind = rlDisplayKind(e);
+    const trainOk = rlTrainLabel(e);
+    const pnl = Number(e.net_profit);
+    const won = e.is_winner || pnl > 0;
+    const lost = Number.isFinite(pnl) && pnl < 0;
+    const pnlTxt = !Number.isFinite(pnl)
+      ? "—"
+      : `${fmt(pnl, 2)}${won ? " ▲" : lost ? " ▼" : ""}`;
+    const eid = escapeHtml(String(e.episode_id || ""));
+    return `<tr data-episode-id="${eid}">
+      <td class="rl-check-col">
+        <input type="checkbox" class="rl-ep-check" data-episode-id="${eid}" ${eid ? "" : "disabled"} />
+      </td>
+      <td class="rl-compact-cell">${fmtTs(e.evaluated_at)}</td>
+      <td class="rl-compact-cell">${e.ticket != null ? `#${e.ticket}` : "—"}</td>
+      <td class="rl-compact-cell">${e.timeframe || "—"}</td>
+      <td class="rl-compact-cell">${pnlTxt}</td>
+      <td class="rl-compact-cell"><span class="rl-pill ${kind}">${rlKindLabel(kind)}</span></td>
+      <td class="rl-pct-cell">${pct(e.reward_total, 1)}</td>
+      <td class="rl-reason-cell">${escapeHtml(reasons || "—")}</td>
+      <td class="rl-reason-cell">${escapeHtml(e.impact_hint || "—")}</td>
+      <td class="rl-reason-cell">${escapeHtml(lessonsTxt || "—")}</td>
+      <td class="rl-compact-cell"><span class="rl-pill ${st}">${rlKnowledgeLabel(st)}</span></td>
+      <td class="rl-compact-cell">${trainOk}</td>
+      <td class="rl-actions-cell">
+        <button class="btn btn-sm danger rl-ep-delete" type="button" data-episode-id="${eid}" ${eid ? "" : "disabled"}>حذف</button>
+      </td>
+    </tr>`;
+  }).join("");
+  syncRlDeleteSelectedBtn();
+}
+
+async function refreshRlEpisodes({ page } = {}) {
+  if (page != null) _rlEpisodesPage = Math.max(1, Number(page) || 1);
+  const ebody = $("#rl-episodes-body");
+  _rlEpisodesLoading = true;
+  updateRlEpisodesPager({ page: _rlEpisodesPage, pages: _rlEpisodesPages });
+  if (ebody && !ebody.querySelector("tr")) {
+    ebody.innerHTML = `<tr><td colspan="13" class="muted">جاري التحميل…</td></tr>`;
+  }
+  try {
+    const params = new URLSearchParams({
+      page: String(_rlEpisodesPage),
+      page_size: String(RL_EPISODES_PAGE_SIZE),
+    });
+    if (_rlTicketQuery) params.set("ticket", _rlTicketQuery);
+    const data = await api(`/api/rl/episodes?${params.toString()}`);
+    renderRlEpisodesTable(data);
+    return data;
+  } catch (err) {
+    if (ebody) {
+      ebody.innerHTML = `<tr><td colspan="13" class="muted">تعذر تحميل الصفقات: ${escapeHtml(err?.message || String(err))}</td></tr>`;
+    }
+    throw err;
+  } finally {
+    _rlEpisodesLoading = false;
+    const prev = $("#btn-rl-page-prev");
+    const next = $("#btn-rl-page-next");
+    if (prev) prev.disabled = _rlEpisodesPage <= 1;
+    if (next) next.disabled = _rlEpisodesPage >= _rlEpisodesPages;
+  }
+}
+
+async function deleteRlEpisodes(ids) {
+  const episodeIds = [...new Set((ids || []).map((x) => String(x || "").trim()).filter(Boolean))];
+  if (!episodeIds.length) return null;
+  const res = await api("/api/rl/episodes/delete", {
+    method: "POST",
+    body: JSON.stringify({ episode_ids: episodeIds }),
+  });
+  return res;
+}
+
+function renderRlMonitor(data) {
+  if (!data || !$("#rl-monitor")) return;
+  const c = data.counts || {};
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = String(v ?? 0); };
+  set("#rl-stat-rewards", c.rewards);
+  set("#rl-stat-penalties", c.penalties);
+  set("#rl-stat-saved", c.knowledge_saved);
+  set("#rl-stat-pending", c.knowledge_pending);
+  set("#rl-stat-rejected", c.knowledge_rejected);
+  set("#rl-stat-queue", c.training_queued);
+
+  const rolling = data.rolling || {};
+  const table = $("#rl-rolling-table");
+  if (table) {
+    table.innerHTML = kvRows([
+      ["الحالة", data.enabled === false ? "معطّل" : "نشط ✓"],
+      ["عدد الحلقات", c.episodes_total ?? 0],
+      ["EMA المكافأة", fmt(rolling.reward_ema, 4)],
+      ["EMA جودة القرار", fmt(rolling.quality_ema, 3)],
+      ["EMA معدل الربح", fmt(rolling.win_rate_ema, 3)],
+      ["عينات EMA", rolling.n ?? 0],
+      ["استُهلك في التدريب", c.training_consumed ?? 0],
+      ["آخر تحديث", fmtTs(data.updated_at)],
+    ]);
+  }
+
+  const lessons = data.top_lessons || [];
+  const ul = $("#rl-lessons-list");
+  if (ul) {
+    ul.innerHTML = lessons.length
+      ? lessons.map((L) => {
+          const pol = L.polarity === "positive" ? "reward" : "penalty";
+          return `<li>
+            <span class="rl-pill ${pol}">${L.polarity === "positive" ? "+" : "−"}</span>
+            ${escapeHtml(L.lesson || "")}
+            <div class="rl-lesson-meta">تكرار ${L.count || 0} · متوسط مكافأة ${fmt(L.avg_reward, 3)}</div>
+          </li>`;
+        }).join("")
+      : `<li class="muted">لا دروس بعد — أغلق صفقة لتبدأ الحلقة</li>`;
+  }
+
+  const tl = data.timeline || [];
+  const tbody = $("#rl-timeline-body");
+  if (tbody) {
+    tbody.innerHTML = tl.length
+      ? tl.map((ev) => {
+          const detail = (ev.lessons && ev.lessons.length)
+            ? ev.lessons.slice(0, 2).join(" · ")
+            : (ev.event || "");
+          return `<tr>
+            <td>${fmtTs(ev.ts)}</td>
+            <td>${escapeHtml(ev.event || "—")}</td>
+            <td>${ev.ticket != null ? `#${ev.ticket}` : "—"}</td>
+            <td>${rlKindLabel(rlDisplayKind(ev))}</td>
+            <td>${ev.reward == null ? "—" : fmt(ev.reward, 3)}</td>
+            <td>${rlKnowledgeLabel(ev.knowledge_status)}</td>
+            <td class="rl-reason-cell">${escapeHtml(detail)}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="7" class="muted">لا أحداث بعد</td></tr>`;
+  }
+
+  const series = data.performance_series || [];
+  const pbody = $("#rl-perf-body");
+  if (pbody) {
+    const view = series.slice().reverse().slice(0, 30);
+    pbody.innerHTML = view.length
+      ? view.map((s) => `<tr>
+          <td>${s.n ?? "—"}</td>
+          <td>${fmtTs(s.ts)}</td>
+          <td>${fmt(s.reward, 3)}</td>
+          <td>${fmt(s.reward_ema, 4)}</td>
+          <td>${fmt(s.quality_ema, 3)}</td>
+          <td>${fmt(s.win_rate_ema, 3)}</td>
+        </tr>`).join("")
+      : `<tr><td colspan="6" class="muted">ستظهر السلسلة بعد أول تقييمات</td></tr>`;
+  }
+
+  const note = $("#rl-paths-note");
+  if (note && data.paths) {
+    note.textContent =
+      `قاعدة المعرفة: ${data.paths.root || "—"} · حلقات محفوظة للتدريب التالي: ${c.training_queued ?? 0}` +
+      (data.enabled === false ? " · المنظومة معطّلة من الإعدادات" : "");
+  }
+}
+
+async function refreshRlMonitor() {
+  try {
+    const data = await api("/api/rl/monitor?episode_limit=5&timeline_limit=60");
+    renderRlMonitor(data);
+    await refreshRlEpisodes();
+  } catch (err) {
+    const note = $("#rl-paths-note");
+    if (note) note.textContent = `تعذر تحديث مراقب RL: ${err?.message || err}`;
+  }
+}
+
+async function exportRlEpisodesExcel() {
+  let res;
+  try {
+    res = await fetch("/api/rl/episodes/export?limit=5000");
+  } catch (err) {
+    throw new Error(friendlyFetchError(err));
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const detail = data.detail || data.error || res.statusText;
+    throw new Error(friendlyFetchError(typeof detail === "string" ? detail : JSON.stringify(detail)));
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") || "";
+  const m = /filename="?([^";]+)"?/i.exec(cd);
+  const name = (m && m[1]) || `rl_evaluated_trades_${Date.now()}.xlsx`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function sideLabel(side) {
   if (side === "buy") return "شراء";
   if (side === "sell") return "بيع";
   return side || "—";
 }
 
+/** Fraction of path from entry toward TP (0–1). */
+function positionTpProximity(p) {
+  const open = Number(p.price_open || 0);
+  const cur = Number(p.price_current || 0);
+  const tp = Number(p.tp || 0);
+  if (!(open > 0) || !(tp > 0)) return 0;
+  const total = p.side === "sell" ? open - tp : tp - open;
+  const progressed = p.side === "sell" ? open - cur : cur - open;
+  if (!(total > 0)) return 0;
+  return Math.max(0, Math.min(1, progressed / total));
+}
+
+/** Fraction of path from entry toward SL (0–1). */
+function positionSlProximity(p) {
+  const open = Number(p.price_open || 0);
+  const cur = Number(p.price_current || 0);
+  const sl = Number(p.sl || 0);
+  if (!(open > 0) || !(sl > 0)) return 0;
+  const total = p.side === "sell" ? sl - open : open - sl;
+  const progressed = p.side === "sell" ? cur - open : open - cur;
+  if (!(total > 0)) return 0;
+  return Math.max(0, Math.min(1, progressed / total));
+}
+
+function proximityHighlightClass(net, p) {
+  if (net > 0) {
+    const prox = positionTpProximity(p);
+    if (prox >= 0.9) return "pos-tp-imminent";
+    if (prox >= 0.7) return "pos-tp-close";
+    if (prox >= 0.5) return "pos-tp-near";
+    return "";
+  }
+  if (net < 0) {
+    const prox = positionSlProximity(p);
+    if (prox >= 0.9) return "pos-sl-imminent";
+    if (prox >= 0.7) return "pos-sl-close";
+    if (prox >= 0.5) return "pos-sl-near";
+    return "";
+  }
+  return "";
+}
+
+function sortOpenPositions(rows) {
+  return [...rows].sort((a, b) => {
+    const netA = Number(a.net_profit ?? a.profit ?? 0);
+    const netB = Number(b.net_profit ?? b.profit ?? 0);
+    const winA = netA > 0 ? 1 : 0;
+    const winB = netB > 0 ? 1 : 0;
+    if (winA !== winB) return winB - winA; // winners first
+    if (winA) return netB - netA; // best profit on top
+    return netA - netB; // worst loss last among losers / flat
+  });
+}
+
 function renderPositions(payload) {
   const body = $("#positions-body");
   const summary = $("#positions-summary");
-  const rows = payload?.positions || [];
+  const rows = sortOpenPositions(payload?.positions || []);
   const total = Number(payload?.total_pnl || 0);
   const winners = Number(payload?.winners || 0);
   const losers = Number(payload?.losers || 0);
+  if (payload?.auto_close) syncAutoCloseControls(payload.auto_close);
+  const chip = $("#positions-live-chip");
+  if (chip) {
+    const liveOk = !payload?.error;
+    chip.classList.toggle("off", !liveOk);
+    chip.title = liveOk
+      ? `مراقبة حية · seq ${payload?.seq ?? "—"} · ${fmtTs(payload?.updated_at)}`
+      : `تعذر التحديث: ${payload?.error || "—"}`;
+  }
+  const liveNote = $("#positions-live-note");
+  if (liveNote && payload?.updated_at) {
+    liveNote.textContent =
+      `تحديث لحظي من خيط مراقبة منفصل · آخر دفعة ${fmtTs(payload.updated_at)}` +
+      (payload?.error ? ` · خطأ: ${payload.error}` : "");
+  }
   if (summary) {
+    const ac = payload?.auto_close;
+    const notes = [];
+    if (ac?.enabled) {
+      notes.push(
+        `<span class="num-ok">إغلاق رابح &gt; ${fmt(Number(ac.min_profit) > 0 ? Number(ac.min_profit) : 0.3, 2)}</span>`,
+      );
+    }
+    if (ac?.loss_enabled) {
+      notes.push(
+        `<span class="num-bad">إغلاق خاسر &lt; -${fmt(Number(ac.max_loss) > 0 ? Number(ac.max_loss) : 0.3, 2)}</span>`,
+      );
+    }
+    const acNote = notes.length ? ` · ${notes.join(" · ")}` : "";
     if (!rows.length) {
-      summary.textContent = "لا صفقات مفتوحة حالياً";
+      summary.innerHTML = `لا صفقات مفتوحة حالياً${acNote}`;
     } else {
       const pnlClass = total > 0 ? "num-ok" : total < 0 ? "num-bad" : "";
       summary.innerHTML =
         `${rows.length} صفقة مفتوحة · رابحة ${winners} · خاسرة ${losers} · صافي ` +
-        `<span class="${pnlClass}">${fmt(total, 2)}</span>`;
+        `<span class="${pnlClass}">${fmt(total, 2)}</span>${acNote}`;
     }
   }
   ["btn-close-winners", "btn-close-losers", "btn-close-all"].forEach((id) => {
@@ -3007,8 +3661,11 @@ function renderPositions(payload) {
   body.innerHTML = rows.map((p) => {
     const net = Number(p.net_profit ?? p.profit ?? 0);
     const pnlClass = net > 0 ? "num-ok" : net < 0 ? "num-bad" : "";
+    const baseClass = net > 0 ? "pos-win" : net < 0 ? "pos-lose" : "";
+    const hlClass = proximityHighlightClass(net, p);
+    const rowClass = [baseClass, hlClass].filter(Boolean).join(" ");
     const sideClass = p.side === "buy" ? "side-buy" : p.side === "sell" ? "side-sell" : "";
-    return `<tr data-ticket="${p.ticket}">
+    return `<tr class="${rowClass}" data-ticket="${p.ticket}">
       <td>#${p.ticket}</td>
       <td class="${sideClass}">${sideLabel(p.side)}</td>
       <td>${fmt(p.volume, 2)}</td>
@@ -3022,28 +3679,270 @@ function renderPositions(payload) {
   }).join("");
 }
 
-async function refreshPositions() {
+let _positionsSeq = -1;
+let _positionsEs = null;
+
+/** Apply a positions snapshot only if it is newer than what the UI already shows. */
+function applyPositionsSnapshot(data, { force = false } = {}) {
+  if (!data || typeof data !== "object") return false;
+  const seq = Number(data?.seq ?? -1);
+  if (!force && seq >= 0 && seq <= _positionsSeq) return false;
+  if (seq >= 0) _positionsSeq = seq;
+  renderPositions(data);
+  return true;
+}
+
+async function refreshPositions({ live = false, force = false } = {}) {
   try {
-    const data = await api("/api/positions");
-    renderPositions(data);
+    const q = live ? "?live=1" : "";
+    const data = await api(`/api/positions${q}`);
+    applyPositionsSnapshot(data, { force });
     return data;
   } catch (e) {
-    renderPositions({ positions: [], total_pnl: 0, winners: 0, losers: 0 });
+    const chip = $("#positions-live-chip");
+    if (chip) {
+      chip.classList.add("off");
+      chip.title = e?.message || String(e);
+    }
     throw e;
   }
 }
 
-async function closePositions({ ticket = null, mode = null, confirmMsg = "" } = {}) {
-  if (confirmMsg && !window.confirm(confirmMsg)) return null;
+function startPositionsStream() {
+  if (_positionsEs || typeof EventSource === "undefined") {
+    refreshPositions({ force: true }).catch(() => {});
+    return;
+  }
+  try {
+    const es = new EventSource("/api/positions/stream");
+    _positionsEs = es;
+    es.onopen = () => {
+      const chip = $("#positions-live-chip");
+      if (chip) chip.classList.remove("off");
+    };
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data || "{}");
+        applyPositionsSnapshot(data);
+      } catch (_) { /* ignore bad frames */ }
+    };
+    es.onerror = () => {
+      try { es.close(); } catch (_) {}
+      _positionsEs = null;
+      const chip = $("#positions-live-chip");
+      if (chip) chip.classList.add("off");
+      // Retry shortly; watcher keeps polling server-side either way.
+      setTimeout(startPositionsStream, 1500);
+    };
+  } catch (_) {
+    _positionsEs = null;
+    refreshPositions({ force: true }).catch(() => {});
+  }
+}
+
+async function closePositions({ ticket = null, mode = null } = {}) {
   const body = ticket != null ? { ticket: Number(ticket) } : { mode };
   const result = await api("/api/positions/close", {
     method: "POST",
     body: JSON.stringify(body),
   });
-  await refreshPositions();
+  await refreshPositions({ live: true, force: true });
   const trades = await api("/api/trades?limit=50").catch(() => ({ trades: [] }));
   renderTrades(trades.trades || []);
   return result;
+}
+
+const AUTO_CLOSE_STORAGE_KEY = "atis.autoClose";
+let _autoCloseSyncing = false;
+
+function normalizeAutoCloseSettings(raw) {
+  return {
+    enabled: Boolean(raw?.enabled),
+    min_profit: Number(raw?.min_profit) > 0 ? Number(raw.min_profit) : 0.3,
+    loss_enabled: Boolean(raw?.loss_enabled),
+    max_loss: Number(raw?.max_loss) > 0 ? Number(raw.max_loss) : 0.3,
+  };
+}
+
+function readAutoCloseLocal() {
+  try {
+    const raw = window.localStorage.getItem(AUTO_CLOSE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return normalizeAutoCloseSettings(parsed);
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeAutoCloseLocal(settings) {
+  try {
+    window.localStorage.setItem(
+      AUTO_CLOSE_STORAGE_KEY,
+      JSON.stringify(normalizeAutoCloseSettings(settings)),
+    );
+  } catch (_) { /* ignore */ }
+}
+
+function syncAutoCloseControls(settings) {
+  const enabledEl = $("#auto-close-enabled");
+  const profitEl = $("#auto-close-min-profit");
+  const lossEnabledEl = $("#auto-close-loss-enabled");
+  const lossEl = $("#auto-close-max-loss");
+  if (!enabledEl || !profitEl) return;
+  const s = normalizeAutoCloseSettings(settings);
+  _autoCloseSyncing = true;
+  enabledEl.checked = s.enabled;
+  profitEl.disabled = !s.enabled;
+  if (document.activeElement !== profitEl) {
+    profitEl.value = String(s.min_profit);
+  }
+  if (lossEnabledEl && lossEl) {
+    lossEnabledEl.checked = s.loss_enabled;
+    lossEl.disabled = !s.loss_enabled;
+    if (document.activeElement !== lossEl) {
+      lossEl.value = String(s.max_loss);
+    }
+  }
+  _autoCloseSyncing = false;
+}
+
+async function pushAutoCloseSettings(partial = {}) {
+  const body = {};
+  if (partial.enabled !== undefined) body.enabled = Boolean(partial.enabled);
+  if (partial.min_profit !== undefined) body.min_profit = Number(partial.min_profit);
+  if (partial.loss_enabled !== undefined) body.loss_enabled = Boolean(partial.loss_enabled);
+  if (partial.max_loss !== undefined) body.max_loss = Number(partial.max_loss);
+  const result = await api("/api/positions/auto-close", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const settings = normalizeAutoCloseSettings(result);
+  writeAutoCloseLocal(settings);
+  syncAutoCloseControls(settings);
+  return settings;
+}
+
+function autoCloseLocalDiffers(local, server) {
+  if (!local) return false;
+  return (
+    local.enabled !== server.enabled
+    || local.min_profit !== server.min_profit
+    || local.loss_enabled !== server.loss_enabled
+    || local.max_loss !== server.max_loss
+  );
+}
+
+async function initAutoCloseControls() {
+  const enabledEl = $("#auto-close-enabled");
+  const profitEl = $("#auto-close-min-profit");
+  const lossEnabledEl = $("#auto-close-loss-enabled");
+  const lossEl = $("#auto-close-max-loss");
+  if (!enabledEl || !profitEl || enabledEl._boundAutoClose) return;
+  enabledEl._boundAutoClose = true;
+
+  const local = readAutoCloseLocal();
+  let server = normalizeAutoCloseSettings({
+    enabled: false,
+    min_profit: 0.3,
+    loss_enabled: false,
+    max_loss: 0.3,
+  });
+  try {
+    const data = await api("/api/positions/auto-close");
+    server = normalizeAutoCloseSettings(data);
+  } catch (_) { /* ignore */ }
+
+  // Prefer local preference on first load after restart (server defaults off).
+  if (autoCloseLocalDiffers(local, server)) {
+    try {
+      server = await pushAutoCloseSettings(local);
+    } catch (_) {
+      syncAutoCloseControls(server);
+    }
+  } else {
+    syncAutoCloseControls(server);
+    writeAutoCloseLocal(server);
+  }
+
+  enabledEl.addEventListener("change", async () => {
+    if (_autoCloseSyncing) return;
+    const enabled = enabledEl.checked;
+    profitEl.disabled = !enabled;
+    try {
+      await pushAutoCloseSettings({
+        enabled,
+        min_profit: Number(profitEl.value) || 0.3,
+      });
+      toast(enabled ? "تم تفعيل الإغلاق الآلي للرابحة" : "تم إيقاف الإغلاق الآلي للرابحة");
+    } catch (e) {
+      toast(e.message || "تعذر تحديث الإغلاق الآلي");
+      syncAutoCloseControls(readAutoCloseLocal() || server);
+    }
+  });
+
+  let profitTimer = null;
+  const commitProfit = async () => {
+    if (_autoCloseSyncing || !enabledEl.checked) return;
+    const value = Number(profitEl.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      toast("حد الربح يجب أن يكون أكبر من صفر");
+      profitEl.value = String(readAutoCloseLocal()?.min_profit || 0.3);
+      return;
+    }
+    try {
+      await pushAutoCloseSettings({ min_profit: value });
+    } catch (e) {
+      toast(e.message || "تعذر تحديث حد الربح");
+    }
+  };
+  profitEl.addEventListener("change", () => { commitProfit(); });
+  profitEl.addEventListener("input", () => {
+    if (_autoCloseSyncing || !enabledEl.checked) return;
+    clearTimeout(profitTimer);
+    profitTimer = setTimeout(() => { commitProfit(); }, 600);
+  });
+
+  if (lossEnabledEl && lossEl) {
+    lossEnabledEl.addEventListener("change", async () => {
+      if (_autoCloseSyncing) return;
+      const lossEnabled = lossEnabledEl.checked;
+      lossEl.disabled = !lossEnabled;
+      try {
+        await pushAutoCloseSettings({
+          loss_enabled: lossEnabled,
+          max_loss: Number(lossEl.value) || 0.3,
+        });
+        toast(lossEnabled ? "تم تفعيل إغلاق الخاسرة" : "تم إيقاف إغلاق الخاسرة");
+      } catch (e) {
+        toast(e.message || "تعذر تحديث إغلاق الخاسرة");
+        syncAutoCloseControls(readAutoCloseLocal() || server);
+      }
+    });
+
+    let lossTimer = null;
+    const commitLoss = async () => {
+      if (_autoCloseSyncing || !lossEnabledEl.checked) return;
+      const value = Number(lossEl.value);
+      if (!Number.isFinite(value) || value <= 0) {
+        toast("حد الخسارة يجب أن يكون أكبر من صفر");
+        lossEl.value = String(readAutoCloseLocal()?.max_loss || 0.3);
+        return;
+      }
+      try {
+        await pushAutoCloseSettings({ max_loss: value });
+      } catch (e) {
+        toast(e.message || "تعذر تحديث حد الخسارة");
+      }
+    };
+    lossEl.addEventListener("change", () => { commitLoss(); });
+    lossEl.addEventListener("input", () => {
+      if (_autoCloseSyncing || !lossEnabledEl.checked) return;
+      clearTimeout(lossTimer);
+      lossTimer = setTimeout(() => { commitLoss(); }, 600);
+    });
+  }
 }
 
 function renderJobs(list) {
@@ -3144,7 +4043,6 @@ async function refresh(patternTf) {
   const trainingP = api("/api/training/details");
   const modelsP = api("/api/models");
   const tradesP = api("/api/trades");
-  const positionsP = apiOptional("/api/positions", { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 });
   const decisionP = apiOptional("/api/decision/latest", { empty: true });
   const patternFilesP = apiOptional("/api/patterns/files", { files: [] });
 
@@ -3154,7 +4052,6 @@ async function refresh(patternTf) {
   let coverage = { coverage: [], state_files: [], registry_root: "data/registry/" };
   let patterns = emptyPatterns;
   let trades = { trades: [] };
-  let positions = { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 };
   let decision = { empty: true };
 
   const paintTraining = () => {
@@ -3201,13 +4098,12 @@ async function refresh(patternTf) {
     trainingP,
     modelsP,
     tradesP,
-    positionsP,
     decisionP,
     patternFilesP,
     trainingPaint,
     overviewPaint,
   ]);
-  const [overviewRes, coverageRes, patternsRes, trainingRes, modelsRes, tradesRes, positionsRes, decisionRes, patternFilesRes] = results;
+  const [overviewRes, coverageRes, patternsRes, trainingRes, modelsRes, tradesRes, decisionRes, patternFilesRes] = results;
 
   overview = settledValue(overviewRes, overview);
   coverage = settledValue(coverageRes, coverage);
@@ -3216,7 +4112,6 @@ async function refresh(patternTf) {
   models = settledValue(modelsRes, models);
   _latestModels = models;
   trades = settledValue(tradesRes, { trades: [] });
-  positions = settledValue(positionsRes, { positions: [], count: 0, winners: 0, losers: 0, total_pnl: 0 });
   decision = settledValue(decisionRes, { empty: true });
   const patternFiles = settledValue(patternFilesRes, { files: [] });
 
@@ -3232,7 +4127,8 @@ async function refresh(patternTf) {
   if (overview.live_settings) applyLiveSettingsForm(overview.live_settings);
   renderAuto(overview.autotrader, models);
   renderDecision(decision);
-  renderPositions(positions);
+  // Open positions are owned exclusively by the live watcher stream — never
+  // overwritten here by a slow / stale refresh cycle.
   renderTrades(trades.trades || []);
   renderJobs(overview.jobs || []);
 
@@ -3649,8 +4545,8 @@ function bind() {
       }, _latestModels || {});
       switchTab("trade");
       toast(mode === "demo"
-        ? `بدأ التداول الآلي Demo · كل إطار بقرار مستقل · ${timeframes.join(" · ")}`
-        : `بدأ التداول الآلي Paper · كل إطار بقرار مستقل · ${timeframes.join(" · ")}`);
+        ? `بدأ التداول الآلي Demo · تأكيد متعدد الأطر مفعّل · ${timeframes.join(" · ")}`
+        : `بدأ التداول الآلي Paper · تأكيد متعدد الأطر مفعّل · ${timeframes.join(" · ")}`);
 
       const status = await api("/api/autotrade/start", {
         method: "POST",
@@ -3660,6 +4556,9 @@ function bind() {
           symbol: "XAUUSD",
           timeframe: timeframes[0],
           timeframes,
+          // Keep per-TF models; Engine5 applies HTF confirm/veto from YAML.
+          multi_tf_independent: timeframes.length > 1,
+          fusion_mode: timeframes.length > 1 ? "independent" : "single",
         }),
       });
       renderAuto(status, _latestModels || {});
@@ -3679,6 +4578,93 @@ function bind() {
   if ($("#btn-auto-start-paper")) {
     $("#btn-auto-start-paper").addEventListener("click", () => startAutoTrading("paper"));
   }
+  $("#btn-rl-refresh")?.addEventListener("click", () => {
+    refreshRlMonitor().catch((e) => toast(e.message || String(e)));
+  });
+  $("#btn-rl-export-excel")?.addEventListener("click", async () => {
+    try {
+      await exportRlEpisodesExcel();
+      toast("تم تصدير الصفقات المقيّمة إلى Excel");
+    } catch (e) {
+      toast(e.message || "تعذر تصدير Excel");
+    }
+  });
+  $("#btn-rl-repair")?.addEventListener("click", async () => {
+    try {
+      const res = await api("/api/rl/repair", { method: "POST", body: "{}" });
+      toast(`تم إصلاح التصنيف · تغيّر ${res?.repair?.changed ?? 0} من ${res?.repair?.repaired ?? 0}`);
+      await refreshRlMonitor();
+    } catch (e) {
+      toast(e.message || String(e));
+    }
+  });
+  const runRlTicketSearch = () => {
+    const input = $("#rl-ticket-search");
+    _rlTicketQuery = String(input?.value || "").trim();
+    refreshRlEpisodes({ page: 1 }).catch((e) => toast(e.message || String(e)));
+  };
+  $("#btn-rl-ticket-search")?.addEventListener("click", runRlTicketSearch);
+  $("#rl-ticket-search")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      runRlTicketSearch();
+    }
+  });
+  $("#btn-rl-ticket-clear")?.addEventListener("click", () => {
+    const input = $("#rl-ticket-search");
+    if (input) input.value = "";
+    _rlTicketQuery = "";
+    refreshRlEpisodes({ page: 1 }).catch((e) => toast(e.message || String(e)));
+  });
+  $("#btn-rl-page-prev")?.addEventListener("click", () => {
+    if (_rlEpisodesPage <= 1 || _rlEpisodesLoading) return;
+    refreshRlEpisodes({ page: _rlEpisodesPage - 1 }).catch((e) => toast(e.message || String(e)));
+  });
+  $("#btn-rl-page-next")?.addEventListener("click", () => {
+    if (_rlEpisodesPage >= _rlEpisodesPages || _rlEpisodesLoading) return;
+    refreshRlEpisodes({ page: _rlEpisodesPage + 1 }).catch((e) => toast(e.message || String(e)));
+  });
+  $("#rl-episodes-select-all")?.addEventListener("change", (ev) => {
+    const checked = !!ev.target.checked;
+    document.querySelectorAll("#rl-episodes-body input.rl-ep-check:not(:disabled)").forEach((el) => {
+      el.checked = checked;
+    });
+    syncRlDeleteSelectedBtn();
+  });
+  $("#rl-episodes-body")?.addEventListener("change", (ev) => {
+    if (ev.target?.matches?.("input.rl-ep-check")) syncRlDeleteSelectedBtn();
+  });
+  $("#rl-episodes-body")?.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".rl-ep-delete");
+    if (!btn) return;
+    const id = btn.getAttribute("data-episode-id");
+    if (!id) return;
+    if (!window.confirm(`حذف الصفقة المقيّمة ${id}؟`)) return;
+    try {
+      btn.disabled = true;
+      const res = await deleteRlEpisodes([id]);
+      toast(res?.deleted ? `تم حذف ${res.deleted} صفقة` : "لم يُحذف شيء");
+      await refreshRlMonitor();
+    } catch (e) {
+      toast(e.message || String(e));
+      btn.disabled = false;
+    }
+  });
+  $("#btn-rl-delete-selected")?.addEventListener("click", async () => {
+    const ids = selectedRlEpisodeIds();
+    if (!ids.length) return;
+    if (!window.confirm(`حذف ${ids.length} صفقة مقيّمة محددة؟`)) return;
+    const btn = $("#btn-rl-delete-selected");
+    try {
+      if (btn) btn.disabled = true;
+      const res = await deleteRlEpisodes(ids);
+      toast(res?.deleted ? `تم حذف ${res.deleted} صفقة` : "لم يُحذف شيء");
+      await refreshRlMonitor();
+    } catch (e) {
+      toast(e.message || String(e));
+      syncRlDeleteSelectedBtn();
+    }
+  });
   $("#btn-auto-stop").addEventListener("click", async () => {
     try {
       $("#btn-auto-stop") && ($("#btn-auto-stop").disabled = true);
@@ -3690,15 +4676,14 @@ function bind() {
     } catch (e) { toast(e.message); }
   });
 
-  const bindCloseBtn = (id, mode, confirmMsg) => {
+  const bindCloseBtn = (id, mode) => {
     const btn = $(`#${id}`);
     if (!btn || btn._boundClose) return;
     btn._boundClose = true;
     btn.addEventListener("click", async () => {
       try {
         btn.disabled = true;
-        const result = await closePositions({ mode, confirmMsg });
-        if (!result) return;
+        const result = await closePositions({ mode });
         const n = result.closed_count ?? result.closed?.length ?? 0;
         toast(n ? `تم إغلاق ${n} صفقة` : "لا صفقات مطابقة للإغلاق");
       } catch (e) {
@@ -3708,9 +4693,9 @@ function bind() {
       }
     });
   };
-  bindCloseBtn("btn-close-winners", "winners", "إغلاق الصفقات الرابحة فقط؟");
-  bindCloseBtn("btn-close-losers", "losers", "إغلاق الصفقات الخاسرة فقط؟");
-  bindCloseBtn("btn-close-all", "all", "إغلاق جميع الصفقات المفتوحة؟");
+  bindCloseBtn("btn-close-winners", "winners");
+  bindCloseBtn("btn-close-losers", "losers");
+  bindCloseBtn("btn-close-all", "all");
 
   const positionsBody = $("#positions-body");
   if (positionsBody && !positionsBody._boundCloseOne) {
@@ -3722,14 +4707,7 @@ function bind() {
       if (!ticket) return;
       try {
         btn.disabled = true;
-        const result = await closePositions({
-          ticket,
-          confirmMsg: `إغلاق الصفقة #${ticket}؟`,
-        });
-        if (!result) {
-          btn.disabled = false;
-          return;
-        }
+        await closePositions({ ticket });
         toast(`تم إغلاق الصفقة #${ticket}`);
       } catch (e) {
         toast(e.message || "تعذر إغلاق الصفقة");
@@ -3815,7 +4793,8 @@ function bind() {
     $("#auto-tf-all").addEventListener("change", () => {
       const on = $("#auto-tf-all").checked;
       $$('#auto-tf-checks input[name="auto-tf"]').forEach((el) => {
-        if (!el.disabled) el.checked = on;
+        if (isAutoTfBlocked(el) || el.disabled) return;
+        el.checked = on;
       });
       syncAutoTfAllCheckbox();
     });
@@ -3858,17 +4837,25 @@ function bind() {
 }
 
 bind();
+initTradeCardCollapse();
 switchTab(getSavedTab() || "train");
 refresh().catch((e) => toast(e.message));
+initAutoCloseControls().catch(() => {});
+// Dedicated live positions path — independent of refresh / training pause.
+startPositionsStream();
 setInterval(() => {
   if (shouldPauseAutoRefresh()) return;
   refresh().catch(() => {});
 }, 15000);
-// Faster pulse: open positions always; trades/decision while autotrader runs.
+// Fallback poll ONLY when SSE is down — never paused by training jobs.
+setInterval(() => {
+  if (_positionsEs && _positionsEs.readyState === EventSource.OPEN) return;
+  refreshPositions().catch(() => {});
+}, 750);
+// Trades / decision / autotrade status while autotrader runs.
 setInterval(async () => {
   if (shouldPauseAutoRefresh()) return;
   try {
-    await refreshPositions().catch(() => {});
     const st = await api("/api/autotrade/status");
     if (!st?.running) return;
     renderAuto(st, _latestModels || {});
@@ -3876,5 +4863,13 @@ setInterval(async () => {
     renderTrades(trades.trades || []);
     const decision = await apiOptional("/api/decision/latest", { empty: true });
     if (!decision.empty) renderDecision(decision);
+    await refreshRlMonitor();
   } catch (_) { /* ignore */ }
 }, 5000);
+// RL monitor while trade tab is visible (even if autotrader stopped — closes still score).
+setInterval(() => {
+  if (shouldPauseAutoRefresh()) return;
+  const tradeTab = $("#tab-trade");
+  if (!tradeTab || !tradeTab.classList.contains("active")) return;
+  refreshRlMonitor().catch(() => {});
+}, 8000);

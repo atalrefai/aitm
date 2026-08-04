@@ -1,35 +1,35 @@
 {
   "timeframe": "M30",
-  "updated_at": "2026-08-03T10:42:06.744012+00:00",
+  "updated_at": "2026-08-04T07:44:30.366998+00:00",
   "symbols": {
     "XAUUSD": {
       "raw": {
         "first_available_ts": "2023-07-31T01:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T22:30:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:02:38.243790+00:00",
-        "row_count": 35529,
-        "checksum": "5989d37df8b1e90abb801be43d59fbe4",
-        "version_hash": "969188b2e7905dad",
+        "last_run_at": "2026-08-04T02:50:50.667785+00:00",
+        "row_count": 35566,
+        "checksum": "a4912a5822e4a99e626fd3993fe78c82",
+        "version_hash": "4b129eded92a35b4",
         "extra_json": "{\"gaps\": [{\"from\": \"2023-07-31T23:30:00+00:00\", \"to\": \"2023-08-01T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-01T23:30:00+00:00\", \"to\": \"2023-08-02T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-02T23:30:00+00:00\", \"to\": \"2023-08-03T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-03T23:30:00+00:00\", \"to\": \"2023-08-04T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-07T23:30:00+00:00\", \"to\": \"2023-08-08T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-08T23:30:00+00:00\", \"to\": \"2023-08-09T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-09T23:30:00+00:00\", \"to\": \"2023-08-10T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-10T23:30:00+00:00\", \"to\": \"2023-08-11T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-14T23:30:00+00:00\", \"to\": \"2023-08-15T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-15T23:30:00+00:00\", \"to\": \"2023-08-16T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-16T23:30:00+00:00\", \"to\": \"2023-08-17T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-17T23:30:00+00:00\", \"to\": \"2023-08-18T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-21T23:30:00+00:00\", \"to\": \"2023-08-22T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-22T23:30:00+00:00\", \"to\": \"2023-08-23T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-23T23:30:00+00:00\", \"to\": \"2023-08-24T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-24T23:30:00+00:00\", \"to\": \"2023-08-25T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-28T23:30:00+00:00\", \"to\": \"2023-08-29T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-29T23:30:00+00:00\", \"to\": \"2023-08-30T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-30T23:30:00+00:00\", \"to\": \"2023-08-31T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}, {\"from\": \"2023-08-31T23:30:00+00:00\", \"to\": \"2023-09-01T01:00:00+00:00\", \"gap\": \"0 days 01:30:00\"}], \"resolved_symbol\": \"XAUUSD@\"}"
       },
       "clean": {
         "first_available_ts": "2023-07-31T01:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T22:30:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:02:48.743581+00:00",
-        "row_count": 36989,
-        "checksum": "54d1b888d46042f90c5d081a08d94bfb",
+        "last_run_at": "2026-08-04T02:50:57.487572+00:00",
+        "row_count": 37026,
+        "checksum": "aa9dbf966d7267f5756d93af02753a09",
         "version_hash": null,
-        "extra_json": "{\"missing_filled\": 4, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0}"
+        "extra_json": "{\"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0}"
       },
       "features": {
         "first_available_ts": "2023-07-31T01:00:00+00:00",
-        "last_updated_ts": "2026-08-03T04:00:00+00:00",
+        "last_updated_ts": "2026-08-03T22:30:00+00:00",
         "last_run_status": "success",
-        "last_run_at": "2026-08-03T08:05:12.529447+00:00",
-        "row_count": 36989,
-        "checksum": "6477c449826c6640b79b55c274e3a8a1",
+        "last_run_at": "2026-08-04T02:53:19.303923+00:00",
+        "row_count": 37026,
+        "checksum": "5c2231ac3793fb06ae401e46c867ca8a",
         "version_hash": null,
         "extra_json": "{\"feature_count\": 178}"
       }
@@ -1763,6 +1763,742 @@
       "symbol": "XAUUSD",
       "timeframe": "M30",
       "detail_json": "{\"version\": \"20260803T104206Z_51013879\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-08-03T11:28:03.600311+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90676931, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4049.28, \"sl\": 4044.2911517281045, \"tp\": 4059.277356859164, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.00;mode=independent;patterns=pat_three_outside_up,pat_bull_engulf,pat_tweezer_bottom,pat_matching_low\", \"ts\": \"2026-08-03T11:28:03.580834+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_three_outside_up\", \"pat_bull_engulf\", \"pat_tweezer_bottom\"], \"pattern_ids\": [\"pat_three_outside_up_M5_56ab923d20\", \"pat_bull_engulf_M5_6095df1375\", \"pat_tweezer_bottom_M5_895bceebe1\"], \"pattern_summary\": \"Three Outside Up (74%), Bullish Engulfing (61%), Tweezer Bottom (61%), Matching Low (50%), Equal Lows (50%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:29:25.708283+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90677494, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4049.25, \"sl\": 4044.2911517281045, \"tp\": 4059.2473568591636, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.02;mode=independent;patterns=pat_three_outside_up,pat_bull_engulf,pat_tweezer_bottom,pat_matching_low\", \"ts\": \"2026-08-03T11:29:25.698186+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_three_outside_up\", \"pat_bull_engulf\", \"pat_tweezer_bottom\"], \"pattern_ids\": [\"pat_three_outside_up_M5_56ab923d20\", \"pat_bull_engulf_M5_6095df1375\", \"pat_tweezer_bottom_M5_895bceebe1\"], \"pattern_summary\": \"Three Outside Up (74%), Bullish Engulfing (61%), Tweezer Bottom (61%), Matching Low (50%), Equal Lows (50%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:30:45.393365+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90677869, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4048.47, \"sl\": 4040.3393676496426, \"tp\": 4057.8202272029107, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl+structure_sl_rejected_too_tight+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_three_outside_up,pat_bull_engulf,pat_tweezer_bottom,pat_bull_harami\", \"ts\": \"2026-08-03T11:30:45.384376+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_three_outside_up\", \"pat_bull_engulf\", \"pat_tweezer_bottom\"], \"pattern_ids\": [\"pat_three_outside_up_M5_56ab923d20\", \"pat_bull_engulf_M5_6095df1375\", \"pat_tweezer_bottom_M5_895bceebe1\"], \"pattern_summary\": \"Three Outside Up (74%), Bullish Engulfing (61%), Tweezer Bottom (61%), Bullish Harami (55%), Tweezer Bottom (55%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:32:06.869722+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90678142, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4048.92, \"sl\": 4044.360155176097, \"tp\": 4058.3116114661048, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.06;mode=independent;patterns=pat_marubozu_bull,pat_equal_lows,pat_three_outside_up,pat_bull_engulf\", \"ts\": \"2026-08-03T11:32:06.861442+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_equal_lows\", \"pat_three_outside_up\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_3fd1594d94\", \"pat_equal_lows_M1_3037bc7ac8\", \"pat_three_outside_up_M5_56ab923d20\"], \"pattern_summary\": \"Bullish Marubozu (79%), Equal Lows (79%), Three Outside Up (74%), Bullish Engulfing (61%), Tweezer Bottom (61%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:33:34.503835+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90678562, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4050.72, \"sl\": 4044.346783747526, \"tp\": 4060.2289922853447, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.49;mode=independent;patterns=pat_marubozu_bull,pat_equal_lows,pat_three_outside_up,pat_tweezer_bottom\", \"ts\": \"2026-08-03T11:33:34.487018+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_equal_lows\", \"pat_three_outside_up\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_3fd1594d94\", \"pat_equal_lows_M1_3037bc7ac8\", \"pat_three_outside_up_M5_56ab923d20\"], \"pattern_summary\": \"Bullish Marubozu (79%), Equal Lows (79%), Three Outside Up (74%), Tweezer Bottom (62%), Bullish Separating Lines (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:35:08.011771+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90678896, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4050.76, \"sl\": 4044.34309803324, \"tp\": 4060.301347254751, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.49;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_equal_lows\", \"ts\": \"2026-08-03T11:35:07.987997+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_equal_lows\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_equal_lows_M30_ed8933625f\"], \"pattern_summary\": \"Tweezer Bottom (62%), Bullish Separating Lines (62%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:36:36.776075+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90679167, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4050.4, \"sl\": 4044.34309803324, \"tp\": 4059.941347254751, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.58;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_equal_lows\", \"ts\": \"2026-08-03T11:36:36.752638+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_equal_lows\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_equal_lows_M30_ed8933625f\"], \"pattern_summary\": \"Tweezer Bottom (61%), Bullish Separating Lines (61%), Equal Lows (61%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:37:59.353529+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90679573, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4051.04, \"sl\": 4044.336926604669, \"tp\": 4060.635523017477, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.43;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_equal_lows\", \"ts\": \"2026-08-03T11:37:59.315372+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_equal_lows\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_equal_lows_M30_ed8933625f\"], \"pattern_summary\": \"Tweezer Bottom (63%), Bullish Separating Lines (63%), Equal Lows (63%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:39:20.781422+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90679790, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4051.97, \"sl\": 4044.336926604669, \"tp\": 4061.565523017477, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp_rejected_far+atr_risk_sl+structure_sl;rr=1.26;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:39:20.763025+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (66%), Bullish Separating Lines (66%), Morning Star (66%), Equal Lows (66%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:40:37.435622+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90680027, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4052.0, \"sl\": 4044.335983747526, \"tp\": 4061.603799870116, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp_rejected_far+atr_risk_sl+structure_sl;rr=1.25;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:40:37.423819+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (66%), Bullish Separating Lines (66%), Morning Star (66%), Equal Lows (66%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:42:03.996482+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90680792, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4052.78, \"sl\": 4044.388957582432, \"tp\": 4062.4296987802036, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:42:03.968760+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (63%), Bullish Separating Lines (63%), Morning Star (63%), Equal Lows (63%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:43:22.474659+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90681523, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4054.59, \"sl\": 4046.058283802406, \"tp\": 4064.4014736272334, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:43:22.458581+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (68%), Bullish Separating Lines (68%), Morning Star (68%), Equal Lows (68%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:44:38.569884+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90681869, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.74, \"sl\": 4045.2082838024057, \"tp\": 4063.551473627233, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:44:38.555629+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (66%), Bullish Separating Lines (66%), Morning Star (66%), Equal Lows (66%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:46:04.261594+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90682395, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.48, \"sl\": 4044.948283802406, \"tp\": 4063.2914736272332, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:46:04.235296+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (65%), Bullish Separating Lines (65%), Morning Star (65%), Equal Lows (65%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:47:27.004839+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90682588, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.94, \"sl\": 4045.408283802406, \"tp\": 4063.7514736272333, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_morning_star,pat_equal_lows\", \"ts\": \"2026-08-03T11:47:26.994335+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_tweezer_bottom_M30_2319bd908a\", \"pat_separating_bull_M30_2b0e2537e9\", \"pat_morning_star_M30_bbba81c0d0\"], \"pattern_summary\": \"Tweezer Bottom (66%), Bullish Separating Lines (66%), Morning Star (66%), Equal Lows (66%), Equal Lows (62%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:48:53.237175+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90683293, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4055.76, \"sl\": 4050.9142694618117, \"tp\": 4066.1476858701076, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.14;mode=independent;patterns=pat_tweezer_bottom,pat_separating_bull,pat_marubozu_bull,pat_tweezer_bottom\", \"ts\": \"2026-08-03T11:48:53.225719+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_bottom\", \"pat_separating_bull\", \"pat_marubozu_bull\"], \"pattern_ids\": [\"pat_tweezer_bottom_M15_08747c842b\", \"pat_separating_bull_M15_6f502eac05\", \"pat_marubozu_bull_M30_55c68ebd21\"], \"pattern_summary\": \"Tweezer Bottom (78%), Bullish Separating Lines (78%), Bullish Marubozu (71%), Tweezer Bottom (71%), Bullish Separating Lines (71%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:50:17.786546+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90684844, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4059.87, \"sl\": 4050.8707266046686, \"tp\": 4070.5107266046684, \"confidence\": 0.7446808510638298, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.18;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_bull_engulf,pat_belt_hold_bull\", \"ts\": \"2026-08-03T11:50:17.774448+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_8fdc6c0faa\", \"pat_belt_hold_bull_M1_076d7df6bb\", \"pat_bull_engulf_M1_291f2df23c\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Bullish Engulfing (99%), Bullish Belt Hold (81%), Tweezer Bottom (81%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:51:46.270938+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90685988, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4060.36, \"sl\": 4051.544088666748, \"tp\": 4070.49829803324, \"confidence\": 0.7446808510638298, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:51:46.262160+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:53:12.055426+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90686897, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4062.33, \"sl\": 4055.231976865505, \"tp\": 4070.492726604669, \"confidence\": 0.6774193548387096, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:53:12.032063+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:54:27.667731+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90687724, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4061.39, \"sl\": 4053.4745855611573, \"tp\": 4070.492726604669, \"confidence\": 0.7446808510638298, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:54:27.649212+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:55:43.184676+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90687994, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4061.61, \"sl\": 4053.8858899089837, \"tp\": 4070.492726604669, \"confidence\": 0.7575757575757576, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:55:43.168590+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:57:10.068786+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90688561, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4060.94, \"sl\": 4052.6332812133314, \"tp\": 4070.492726604669, \"confidence\": 0.7446808510638298, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:57:10.051999+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T11:58:33.505425+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90689174, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4061.79, \"sl\": 4054.222411648114, \"tp\": 4070.492726604669, \"confidence\": 0.6774193548387096, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T11:58:33.469070+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T12:00:02.559460+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90689605, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4062.33, \"sl\": 4055.231976865505, \"tp\": 4070.492726604669, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_three_soldiers,pat_marubozu_bull\", \"ts\": \"2026-08-03T12:00:02.546389+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_three_soldiers\"], \"pattern_ids\": [\"pat_marubozu_bull_M1_32c7c362b0\", \"pat_belt_hold_bull_M1_90300d76f8\", \"pat_three_soldiers_M1_6e7ea30779\"], \"pattern_summary\": \"Bullish Marubozu (99%), Bullish Belt Hold (99%), Three White Soldiers (99%), Bullish Marubozu (99%), Bullish Belt Hold (99%)\"}"
+    },
+    {
+      "ts": "2026-08-03T12:13:51.776412+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90694420, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4055.73, \"sl\": 4050.8546461329065, \"tp\": 4067.4746461329064, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.41;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_tweezer_bottom,pat_separating_bull\", \"ts\": \"2026-08-03T12:13:51.745933+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_tweezer_bottom\"], \"pattern_ids\": [\"pat_marubozu_bull_M30_55c68ebd21\", \"pat_belt_hold_bull_M30_b9459285b6\", \"pat_tweezer_bottom_M30_2319bd908a\"], \"pattern_summary\": \"Bullish Marubozu (86%), Bullish Belt Hold (86%), Tweezer Bottom (86%), Bullish Separating Lines (86%), Morning Star (86%)\"}"
+    },
+    {
+      "ts": "2026-08-03T12:15:19.402582+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90694830, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4055.92, \"sl\": 4050.853617561478, \"tp\": 4067.473617561478, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.28;mode=independent;patterns=pat_marubozu_bull,pat_belt_hold_bull,pat_tweezer_bottom,pat_separating_bull\", \"ts\": \"2026-08-03T12:15:19.374668+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_marubozu_bull\", \"pat_belt_hold_bull\", \"pat_tweezer_bottom\"], \"pattern_ids\": [\"pat_marubozu_bull_M30_55c68ebd21\", \"pat_belt_hold_bull_M30_b9459285b6\", \"pat_tweezer_bottom_M30_2319bd908a\"], \"pattern_summary\": \"Bullish Marubozu (86%), Bullish Belt Hold (86%), Tweezer Bottom (86%), Bullish Separating Lines (86%), Morning Star (86%)\"}"
+    },
+    {
+      "ts": "2026-08-04T02:50:50.672202+00:00",
+      "engine": "engine1",
+      "event": "ingest_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"M30\", \"mode\": \"incremental\", \"rows_fetched\": 39, \"rows_written\": 37, \"rows_total\": 35566, \"first_ts\": \"2023-07-31T01:00:00+00:00\", \"last_ts\": \"2026-08-03T22:30:00+00:00\", \"gaps_detected\": 623, \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:50:57.492189+00:00",
+      "engine": "engine2",
+      "event": "clean_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"M30\", \"rows_processed\": 37, \"rows_total\": 37026, \"missing_filled\": 0, \"outliers_flagged\": 0, \"gaps_dropped\": 0, \"quality_score\": 1.0, \"first_ts\": \"2023-07-31T01:00:00+00:00\", \"last_ts\": \"2026-08-03T22:30:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:51:48.924945+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"M30\", \"rows_processed\": 37, \"rows_total\": 37026, \"feature_count\": 178, \"first_ts\": \"2023-07-31T01:00:00+00:00\", \"last_ts\": \"2026-08-03T22:30:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T02:53:19.509380+00:00",
+      "engine": "engine3",
+      "event": "features_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"symbol\": \"XAUUSD\", \"timeframe\": \"M30\", \"rows_processed\": 0, \"rows_total\": 37026, \"feature_count\": 178, \"first_ts\": \"2023-07-31T01:00:00+00:00\", \"last_ts\": \"2026-08-03T22:30:00+00:00\", \"error\": null}"
+    },
+    {
+      "ts": "2026-08-04T03:25:47.030840+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"version\": \"20260804T032546Z_51013879\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-08-04T03:37:07.709183+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90932136, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.66, \"sl\": 4049.6044158958653, \"tp\": 4064.7739217197545, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_bull_engulf,pat_separating_bull,pat_morning_star,pat_rounding_bottom\", \"ts\": \"2026-08-04T03:37:07.620246+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_bull_engulf\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_bull_engulf_M30_4b79b3c6d8\", \"pat_separating_bull_M30_c31d459946\", \"pat_morning_star_M30_421a6aa794\"], \"pattern_summary\": \"Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%), Rounding Bottom (85%), Matching Low (69%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:38:40.714639+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90932189, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.62, \"sl\": 4049.5644158958653, \"tp\": 4064.7339217197546, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_bull_engulf,pat_separating_bull,pat_morning_star,pat_rounding_bottom\", \"ts\": \"2026-08-04T03:38:40.662915+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_bull_engulf\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_bull_engulf_M30_4b79b3c6d8\", \"pat_separating_bull_M30_c31d459946\", \"pat_morning_star_M30_421a6aa794\"], \"pattern_summary\": \"Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%), Rounding Bottom (85%), Matching Low (69%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:40:06.301120+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90932264, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.11, \"sl\": 4049.0544158958655, \"tp\": 4064.223921719755, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_bull_engulf,pat_separating_bull,pat_morning_star,pat_rounding_bottom\", \"ts\": \"2026-08-04T03:40:06.258590+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_bull_engulf\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_bull_engulf_M30_4b79b3c6d8\", \"pat_separating_bull_M30_c31d459946\", \"pat_morning_star_M30_421a6aa794\"], \"pattern_summary\": \"Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%), Rounding Bottom (85%), Matching Low (69%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:41:35.272059+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90932686, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4055.15, \"sl\": 4048.0276776374344, \"tp\": 4063.3406707169506, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_bull_engulf,pat_separating_bull,pat_morning_star,pat_rounding_bottom\", \"ts\": \"2026-08-04T03:41:35.229738+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_bull_engulf\", \"pat_separating_bull\", \"pat_morning_star\"], \"pattern_ids\": [\"pat_bull_engulf_M30_4b79b3c6d8\", \"pat_separating_bull_M30_c31d459946\", \"pat_morning_star_M30_421a6aa794\"], \"pattern_summary\": \"Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%), Rounding Bottom (85%), Matching Low (69%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:43:07.148101+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90933226, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.56, \"sl\": 4045.96401047123, \"tp\": 4062.2953879580855, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:43:07.111069+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (89%), Equal Lows (89%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:49:36.479048+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90933931, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4054.01, \"sl\": 4046.353487198715, \"tp\": 4062.8149897214785, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:49:36.435214+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:51:16.138658+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90933983, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4054.61, \"sl\": 4046.953487198715, \"tp\": 4063.4149897214784, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:51:16.081598+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:52:54.223703+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90934062, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4055.24, \"sl\": 4047.956066364567, \"tp\": 4063.6165236807474, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:52:54.116388+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:57:26.077157+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90934510, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4054.41, \"sl\": 4046.7534871987145, \"tp\": 4063.214989721478, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:57:26.042265+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T03:58:56.328685+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90934728, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.59, \"sl\": 4045.933487198715, \"tp\": 4062.3949897214784, \"confidence\": 0.65625, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T03:58:56.268320+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T04:08:59.093283+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90935701, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4053.9, \"sl\": 4045.799103323083, \"tp\": 4064.1154222871587, \"confidence\": 0.6774193548387096, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.26;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T04:08:59.052615+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T04:10:36.935881+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90935809, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4054.05, \"sl\": 4045.9179754428988, \"tp\": 4064.111908001444, \"confidence\": 0.6774193548387096, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.24;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T04:10:36.889192+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T04:20:02.293169+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90937213, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.66, \"sl\": 4050.217198011166, \"tp\": 4064.0692222871585, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T04:20:02.267704+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T04:21:30.352808+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90937323, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.44, \"sl\": 4049.8058936633406, \"tp\": 4064.0692222871585, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T04:21:30.317971+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T04:24:30.130977+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90937620, \"symbol\": \"XAUUSD\", \"side\": \"buy\", \"volume\": 0.01, \"entry_price\": 4056.93, \"sl\": 4050.721980619862, \"tp\": 4064.0692222871585, \"confidence\": 0.6097560975609756, \"reason\": \"pred=1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_triangle_asc,pat_equal_lows,pat_bull_engulf,pat_separating_bull\", \"ts\": \"2026-08-04T04:24:30.096671+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_triangle_asc\", \"pat_equal_lows\", \"pat_bull_engulf\"], \"pattern_ids\": [\"pat_triangle_asc_M5_eb29577b44\", \"pat_equal_lows_M5_c819cec9fc\", \"pat_bull_engulf_M30_4b79b3c6d8\"], \"pattern_summary\": \"Ascending Triangle (95%), Equal Lows (95%), Bullish Engulfing (85%), Bullish Separating Lines (85%), Morning Star (85%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:02:21.691678+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90942601, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.35, \"sl\": 4070.6018768033077, \"tp\": 4055.010341676196, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_equal_highs,pat_wedge_rising\", \"ts\": \"2026-08-04T05:02:21.585110+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_equal_highs\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_equal_highs_M1_8da9e6e06d\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Equal Highs (99%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:03:45.506837+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90942715, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.75, \"sl\": 4071.006705657063, \"tp\": 4055.4047884943775, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_equal_highs,pat_wedge_rising\", \"ts\": \"2026-08-04T05:03:45.463849+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_equal_highs\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_equal_highs_M1_8da9e6e06d\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Equal Highs (99%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:05:13.133022+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90942986, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.41, \"sl\": 4069.7722506034206, \"tp\": 4053.943411806066, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl+structure_sl_rejected_too_tight+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_equal_highs,pat_wedge_rising\", \"ts\": \"2026-08-04T05:05:13.092929+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_equal_highs\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_equal_highs_M1_8da9e6e06d\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Equal Highs (99%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:06:42.172106+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90943112, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.93, \"sl\": 4065.944868100796, \"tp\": 4053.4626184943777, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.11;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:06:42.120270+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:08:11.127604+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90943292, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.62, \"sl\": 4065.9468395293675, \"tp\": 4053.1343723255463, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.96;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:08:11.056372+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:09:41.960081+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90943735, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.91, \"sl\": 4065.954468100796, \"tp\": 4052.3537675852867, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.70;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:09:41.909729+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:11:11.581563+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90943950, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.05, \"sl\": 4065.9585823865104, \"tp\": 4051.455688624248, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.45;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:11:11.538648+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:12:41.282076+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90944355, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4058.68, \"sl\": 4065.9728109579387, \"tp\": 4049.953998883988, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.20;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:12:41.217641+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:14:13.010537+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90944893, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4058.35, \"sl\": 4065.9827538150817, \"tp\": 4049.5319747281437, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.16;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:14:12.971252+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:15:44.015916+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90945020, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4057.95, \"sl\": 4065.6178480624835, \"tp\": 4049.1319747281436, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl_rr_fallback_atr+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_on_neck,pat_wedge_rising,pat_belt_hold_bear,pat_equal_highs\", \"ts\": \"2026-08-04T05:15:43.984920+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_on_neck\", \"pat_wedge_rising\", \"pat_belt_hold_bear\"], \"pattern_ids\": [\"pat_on_neck_M1_67dec35023\", \"pat_wedge_rising_M1_40a6309614\", \"pat_belt_hold_bear_M1_edd4beda72\"], \"pattern_summary\": \"On-Neck (99%), Rising Wedge (99%), Bearish Belt Hold (99%), Equal Highs (99%), Rising Wedge (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:21:12.620785+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90946147, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.9, \"sl\": 4065.9827538150817, \"tp\": 4052.794554824535, \"confidence\": 0.6896551724137931, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=2.23;mode=independent;patterns=pat_matching_high,pat_double_top,pat_triple_top,pat_wedge_rising\", \"ts\": \"2026-08-04T05:21:12.574013+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_matching_high\", \"pat_double_top\", \"pat_triple_top\"], \"pattern_ids\": [\"pat_matching_high_M1_d27194fe1c\", \"pat_double_top_M1_c3ecd8b53f\", \"pat_triple_top_M1_a02136a710\"], \"pattern_summary\": \"Matching High (85%), Double Top (85%), Triple Top (85%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:23:38.664002+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90946368, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.43, \"sl\": 4065.9827538150817, \"tp\": 4052.6119747281437, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+structure_sl;rr=1.94;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:23:38.517137+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:25:14.309971+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90946773, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.58, \"sl\": 4071.2478480624836, \"tp\": 4054.7619747281437, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:25:14.266893+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:26:43.733172+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90946988, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.36, \"sl\": 4071.027848062484, \"tp\": 4054.541974728144, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:26:43.690104+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:28:13.483007+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90947153, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.0, \"sl\": 4070.6678480624837, \"tp\": 4054.181974728144, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:28:13.438545+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:29:43.058571+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90947241, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.99, \"sl\": 4070.6578480624835, \"tp\": 4054.1719747281436, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:29:42.996503+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:33:26.564743+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90948596, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.43, \"sl\": 4071.6778800188654, \"tp\": 4052.065585685433, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.38;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:33:26.519892+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:34:56.106314+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90948970, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.2, \"sl\": 4065.963299971147, \"tp\": 4052.0732999711468, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.69;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:34:56.023214+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:36:25.804706+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90949445, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.34, \"sl\": 4065.970671399719, \"tp\": 4052.0806713997185, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.00;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:36:25.725889+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:38:07.128971+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90949928, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.17, \"sl\": 4065.9830142568617, \"tp\": 4052.0930142568614, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.39;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:38:07.098803+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:41:10.803167+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90950527, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4059.59, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.17;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:41:10.741688+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:42:42.377141+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90950721, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.57, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.56;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:42:42.340585+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:44:11.733862+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90951056, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.99, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.47;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:44:11.678870+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:45:44.842171+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90951405, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.62, \"sl\": 4071.1588873240603, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.23;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:45:44.804859+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:46:22.347711+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"version\": \"20260804T054622Z_51013879\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-08-04T05:47:17.982787+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90951786, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.02, \"sl\": 4071.5588873240604, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.28;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:47:17.915114+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:48:39.517764+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90951915, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.04, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.52;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:48:39.316625+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:49:56.994159+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90952241, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.75, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.65;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:49:56.956149+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:51:14.767311+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90952379, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.34, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.99;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:51:14.726181+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:52:37.743449+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90952500, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4060.96, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.76;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:52:37.677366+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:53:55.295520+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90952588, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.08, \"sl\": 4065.98824282829, \"tp\": 4052.0982428282896, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.83;mode=independent;patterns=pat_tweezer_top,pat_separating_bear,pat_evening_star,pat_wedge_rising\", \"ts\": \"2026-08-04T05:53:55.255840+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_tweezer_top\", \"pat_separating_bear\", \"pat_evening_star\"], \"pattern_ids\": [\"pat_tweezer_top_M15_4c86caa27c\", \"pat_separating_bear_M15_ce542495a3\", \"pat_evening_star_M15_6e94e7c8e6\"], \"pattern_summary\": \"Tweezer Top (84%), Bearish Separating Lines (84%), Evening Star (84%), Rising Wedge (84%), Equal Highs (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:55:24.261291+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90953235, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4059.72, \"sl\": 4065.993128542576, \"tp\": 4052.1031285425756, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.21;mode=independent;patterns=pat_belt_hold_bear,pat_three_crows,pat_double_top,pat_tweezer_top\", \"ts\": \"2026-08-04T05:55:24.192296+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_three_crows\", \"pat_double_top\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_three_crows_M1_6fab1bcb15\", \"pat_double_top_M1_162904c42b\"], \"pattern_summary\": \"Bearish Belt Hold (91%), Three Black Crows (91%), Double Top (91%), Tweezer Top (84%), Bearish Separating Lines (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:57:43.006102+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90953565, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.38, \"sl\": 4065.993128542576, \"tp\": 4052.1031285425756, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.01;mode=independent;patterns=pat_belt_hold_bear,pat_three_crows,pat_double_top,pat_tweezer_top\", \"ts\": \"2026-08-04T05:57:42.939587+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_three_crows\", \"pat_double_top\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_three_crows_M1_6fab1bcb15\", \"pat_double_top_M1_162904c42b\"], \"pattern_summary\": \"Bearish Belt Hold (91%), Three Black Crows (88%), Double Top (88%), Tweezer Top (84%), Bearish Separating Lines (84%)\"}"
+    },
+    {
+      "ts": "2026-08-04T05:59:54.317501+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90953976, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.11, \"sl\": 4065.993128542576, \"tp\": 4052.1031285425756, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.58;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T05:59:54.250137+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:03:26.846891+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90955078, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.78, \"sl\": 4071.2584406672504, \"tp\": 4055.1797932326626, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:03:26.761266+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:09:17.062036+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90956087, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.46, \"sl\": 4071.7700477958115, \"tp\": 4052.0725622181058, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.37;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:09:17.001269+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:11:03.321423+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90956431, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.23, \"sl\": 4071.5400477958115, \"tp\": 4052.0725622181058, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.34;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:11:03.225314+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:18:32.428062+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90957580, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.28, \"sl\": 4071.5900477958116, \"tp\": 4052.0725622181058, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.35;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:18:32.340133+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:20:13.863350+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90958071, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4061.98, \"sl\": 4065.9633336466777, \"tp\": 4052.0733336466774, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=2.49;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:20:13.785266+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:22:11.566337+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90958314, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.36, \"sl\": 4070.6088511295357, \"tp\": 4055.023821201034, \"confidence\": 0.6257421036048403, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+atr_risk_sl+sl_tightened_for_rr;rr=1.15;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:22:11.463347+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:26:02.349761+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90959070, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4063.21, \"sl\": 4071.526921984123, \"tp\": 4052.0733336466774, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl;rr=1.34;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:26:02.261680+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:28:01.097856+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90959435, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4062.25, \"sl\": 4070.566921984123, \"tp\": 4052.0733336466774, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl+structure_sl_rejected_too_tight;rr=1.22;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:28:01.002388+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T06:28:08.141770+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"version\": \"20260804T062807Z_51013879\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-08-04T06:28:11.851918+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"version\": \"20260804T062810Z_51013879\", \"passed\": true}"
+    },
+    {
+      "ts": "2026-08-04T06:30:10.770392+00:00",
+      "engine": "engine5",
+      "event": "signal",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"ticket\": 90960230, \"symbol\": \"XAUUSD\", \"side\": \"sell\", \"volume\": 0.01, \"entry_price\": 4059.91, \"sl\": 4065.9817622181063, \"tp\": 4052.091762218106, \"confidence\": 0.6590909090909092, \"reason\": \"pred=-1;retcode=10009;tf=M30;entry=1/1;spread_pips=n/a;spread_filter_off;exit=atr_confidence_fallback+structure_tp+atr_risk_sl+structure_sl;rr=1.29;mode=independent;patterns=pat_belt_hold_bear,pat_on_neck,pat_triangle_desc,pat_three_crows\", \"ts\": \"2026-08-04T06:30:10.700550+00:00\", \"mode\": \"demo\", \"pattern_keys\": [\"pat_belt_hold_bear\", \"pat_on_neck\", \"pat_triangle_desc\"], \"pattern_ids\": [\"pat_belt_hold_bear_M1_a21d9fb82a\", \"pat_on_neck_M1_44cc03667e\", \"pat_triangle_desc_M1_303a7e5063\"], \"pattern_summary\": \"Bearish Belt Hold (91%), On-Neck (91%), Descending Triangle (91%), Three Black Crows (88%), Double Top (88%)\"}"
+    },
+    {
+      "ts": "2026-08-04T07:44:30.365854+00:00",
+      "engine": "engine4",
+      "event": "train_success",
+      "symbol": "XAUUSD",
+      "timeframe": "M30",
+      "detail_json": "{\"version\": \"20260804T074430Z_51013879\", \"passed\": true}"
     }
   ]
 }

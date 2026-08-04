@@ -115,7 +115,52 @@ def training_source_meta(symbol: str, timeframe: str) -> dict[str, Any]:
             "structural_count": _section_count("structural"),
             "discovery_count": _section_count("discovery_log"),
         },
+        "live_winning_trades": _live_winning_meta(symbol, timeframe),
+        "rl_knowledge": _rl_knowledge_meta(symbol, timeframe),
     }
+
+
+def _live_winning_meta(symbol: str, timeframe: str) -> dict[str, Any]:
+    try:
+        from atis.shared.winning_trade_store import (
+            load_winning_trades,
+            winning_trade_training_context,
+            winning_trades_path,
+        )
+
+        rows = load_winning_trades(symbol=symbol, timeframe=timeframe)
+        return {
+            "path": str(winning_trades_path()),
+            "count": len(rows),
+            "context": winning_trade_training_context(symbol, timeframe),
+        }
+    except Exception as exc:
+        return {"path": None, "count": 0, "error": str(exc)}
+
+
+def _rl_knowledge_meta(symbol: str, timeframe: str) -> dict[str, Any]:
+    try:
+        from atis.shared.rl_learning import (
+            episodes_pending_for_training,
+            load_episodes,
+            rl_training_context,
+        )
+        from atis.shared.rl_learning.knowledge_store import root_dir
+
+        saved = [
+            e
+            for e in load_episodes(limit=500, symbol=symbol, timeframe=timeframe)
+            if str(e.get("knowledge_status") or "") == "saved"
+        ]
+        pending = episodes_pending_for_training()
+        return {
+            "path": str(root_dir()),
+            "saved_count": len(saved),
+            "pending_training": len(pending),
+            "context": rl_training_context(symbol, timeframe),
+        }
+    except Exception as exc:
+        return {"path": None, "saved_count": 0, "pending_training": 0, "error": str(exc)}
 
 
 def _safe_mean(values: list[float]) -> float:
@@ -533,8 +578,57 @@ def load_training_frame(symbol: str, timeframe: str) -> tuple[pd.DataFrame, dict
         "pattern_bullish_ratio": bull_occ / max(total_occ, 1.0),
         "pattern_bearish_ratio": bear_occ / max(total_occ, 1.0),
     }
+    # Live winning trades corpus (pattern + full details) → training context.
+    try:
+        from atis.shared.winning_trade_store import winning_trade_training_context
+
+        context_cols.update(winning_trade_training_context(symbol, timeframe))
+    except Exception:
+        context_cols.update(
+            {
+                "live_winning_trades_count": 0.0,
+                "live_winning_avg_confidence": 0.0,
+                "live_winning_avg_profit": 0.0,
+                "live_winning_pattern_diversity": 0.0,
+                "live_winning_buy_ratio": 0.0,
+            }
+        )
+
+    e4_cfg = load_engine_config().get("engine4_training", {}) or {}
+
+    # Online RL knowledge (saved episodes + policy EMA) → training context.
+    # Prefer full bar-level injection (feat_rl_*) so features survive constant-drop.
+    rl_meta: dict[str, Any] = {"enabled": False}
+    try:
+        from atis.shared.rl_learning import inject_rl_training_features, rl_training_context
+
+        if bool(e4_cfg.get("rl_features_enabled", True)):
+            df, rl_meta = inject_rl_training_features(df, symbol, timeframe)
+        else:
+            context_cols.update(rl_training_context(symbol, timeframe))
+            for col, value in context_cols.items():
+                if str(col).startswith("rl_"):
+                    df[col] = float(value)
+            rl_meta = {"enabled": False, "reason": "rl_features_disabled"}
+    except Exception as exc:
+        context_cols.update(
+            {
+                "rl_episodes_saved": 0.0,
+                "rl_avg_reward": 0.0,
+                "rl_reward_ema": 0.0,
+                "rl_quality_ema": 0.5,
+                "rl_win_rate_ema": 0.5,
+                "rl_pending_training": 0.0,
+                "rl_policy_tf_weight": 0.0,
+                "rl_penalty_ratio": 0.0,
+            }
+        )
+        rl_meta = {"enabled": False, "error": str(exc)}
+
+    # Remaining non-RL context scalars (registry / pattern / winning-trades).
     for col, value in context_cols.items():
-        df[col] = float(value)
+        if col not in df.columns:
+            df[col] = float(value)
 
     # Merge bar-level promoted NewN / pattern signals (causal fire flags)
     sig = load_pattern_signal_matrix(symbol, timeframe)
@@ -577,7 +671,6 @@ def load_training_frame(symbol: str, timeframe: str) -> tuple[pd.DataFrame, dict
             df["pattern_promoted_bias_score"] = score
     source_meta_injected = injected
 
-    e4_cfg = load_engine_config().get("engine4_training", {}) or {}
     relations_meta: dict[str, Any] = {"enabled": False, "reason": "disabled"}
     if bool(e4_cfg.get("pattern_relation_features", True)):
         rel_sec = load_section(symbol, timeframe, "relations") or {}
@@ -653,6 +746,7 @@ def load_training_frame(symbol: str, timeframe: str) -> tuple[pd.DataFrame, dict
             "engine4_recommended_count": len(recommended),
             "injected_signal_columns": source_meta_injected,
             "relation_features": relations_meta,
+            "rl_features": rl_meta,
             "avg_success_rate": _safe_mean(success_vals),
             "avg_confidence": _safe_mean(conf_vals),
             "avg_forward_return": _safe_mean(fwd_vals),

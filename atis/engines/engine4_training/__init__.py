@@ -443,6 +443,9 @@ def _feature_relative_score(name: str) -> int:
         score += 4
     if n.startswith("feat_rel_"):
         score += 3
+    # Online RL → live reward knowledge (keep through relative preference).
+    if n.startswith("feat_rl_") or n.startswith("rl_"):
+        score += 5
     return score
 
 
@@ -2042,8 +2045,8 @@ def prepare_xy(
         }]
     if bool(cfg.get("prefer_relative_features", True)):
         feature_cols = prefer_relative_features(feature_cols, keep_min=int(cfg.get("min_relative_features", 12)))
-    # Always keep multi-TF / engineered / relation features when present.
-    boost_prefixes = ("htf_", "mtf_", "feat_", "feat_rel_")
+    # Always keep multi-TF / engineered / relation / RL features when present.
+    boost_prefixes = ("htf_", "mtf_", "feat_", "feat_rel_", "feat_rl_", "rl_")
     boosted = [c for c in select_feature_columns(work) if str(c).startswith(boost_prefixes)]
     for c in boosted:
         if c not in feature_cols and c not in {"label", "label_weight"}:
@@ -2068,7 +2071,14 @@ def prepare_xy(
 
     if bool(cfg.get("drop_constant_features", True)):
         kept: list[str] = []
+        protect = tuple(cfg.get("keep_constant_prefixes") or ("feat_rl_",))
         for c in feature_cols:
+            # Always retain bar-level RL features even if sparse/low-variance early on.
+            if any(str(c).startswith(p) for p in protect):
+                std = float(work[c].std(skipna=True) or 0.0)
+                if std > 1e-12 or int(work[c].nunique(dropna=True)) > 1:
+                    kept.append(c)
+                continue
             s = work[c]
             if int(s.nunique(dropna=True)) <= 1:
                 continue
@@ -2076,7 +2086,35 @@ def prepare_xy(
             if std <= 1e-12:
                 continue
             kept.append(c)
+        # Prefer protected RL cols + non-constants; fall back to prior list if empty.
         feature_cols = kept or feature_cols
+
+    # Re-weight samples using RL affinity / conflict (train+val+test share same rule).
+    if bool(cfg.get("rl_label_reweight", True)):
+        strength = float(cfg.get("rl_label_reweight_strength", 0.35) or 0.0)
+        if strength > 0 and "feat_rl_pattern_affinity" in work.columns:
+            aff = work["feat_rl_pattern_affinity"].fillna(0.0).astype(float).to_numpy()
+            conflict = (
+                work["feat_rl_pattern_conflict"].fillna(0.0).astype(float).to_numpy()
+                if "feat_rl_pattern_conflict" in work.columns
+                else np.zeros(len(work), dtype=float)
+            )
+            edge = (
+                work["feat_rl_net_edge"].fillna(0.0).astype(float).to_numpy()
+                if "feat_rl_net_edge" in work.columns
+                else (aff - conflict)
+            )
+            boost = 1.0 + strength * np.tanh(edge)
+            boost *= 1.0 - 0.45 * strength * np.tanh(np.maximum(conflict, 0.0))
+            # Mild directional agreement with side×bias when present.
+            if "feat_rl_side_x_bias" in work.columns and "label" in work.columns:
+                side_x = work["feat_rl_side_x_bias"].fillna(0.0).astype(float).to_numpy()
+                y_sign = np.sign(work["label"].astype(float).to_numpy())
+                agree = y_sign * np.sign(side_x)
+                boost *= 1.0 + 0.2 * strength * np.clip(agree, -1.0, 1.0)
+            work["label_weight"] = np.clip(
+                work["label_weight"].astype(float).to_numpy() * boost, 0.12, 3.5
+            )
 
     work = work.dropna(subset=["label"] + feature_cols)
     # Keep timeout class (0) in the chronological index so hold_bars maps to
@@ -2219,13 +2257,16 @@ def train_symbol_timeframe(
         df, source_meta = load_training_frame(symbol, timeframe)
         if log:
             cross = source_meta.get("cross_tf") or {}
+            rl_feat = (source_meta.get("pattern_summary") or {}).get("rl_features") or {}
             log(
                 f"[{timeframe}] pipeline={PIPELINE_VERSION} "
                 f"source={source_meta['features_json_path']} "
                 f"rows={source_meta['row_count']} "
                 f"patterns={source_meta['pattern_summary']['knowledge_count']} "
                 f"htf_cols={cross.get('n_htf_cols', 0)} "
-                f"htf_sources={[s.get('timeframe') for s in (cross.get('sources') or [])]}"
+                f"htf_sources={[s.get('timeframe') for s in (cross.get('sources') or [])]} "
+                f"rl_feats={rl_feat.get('n_matched_pattern_cols', 0)}/"
+                f"{len(rl_feat.get('columns') or [])} eps={rl_feat.get('n_episodes', 0)}"
             )
         _emit_stage("features", 6.0, f"هندسة ميزات / Cross-TF · {timeframe}")
         barrier_sweep: dict[str, Any] = {"enabled": False}
@@ -4725,6 +4766,23 @@ def train_symbol_timeframe(
         except Exception as exc:  # pragma: no cover
             if log:
                 log(f"[{timeframe}] knowledge_loop_error={exc}")
+
+        # Consume RL training queue for this symbol/TF so next cycle sees fresh lessons.
+        try:
+            if bool(cfg.get("rl_consume_queue_on_train", True)):
+                from atis.shared.rl_learning import consume_rl_for_training
+
+                rl_consume = consume_rl_for_training(symbol, timeframe)
+                metrics["rl_training_consume"] = rl_consume
+                if log and rl_consume.get("consumed"):
+                    log(
+                        f"[{timeframe}] rl_queue_consumed={rl_consume.get('consumed')} "
+                        f"(reward/penalty knowledge applied to this train cycle)"
+                    )
+        except Exception as exc:
+            metrics["rl_training_consume"] = {"error": str(exc)}
+            if log:
+                log(f"[{timeframe}] rl_consume_error={exc}")
 
         (out_dir / "metrics_report.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
         try:

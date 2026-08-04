@@ -75,7 +75,10 @@ class LiveLoopReport:
     orders_sent: int = 0
     blocked_by_risk: int = 0
     errors: list[str] = field(default_factory=list)
+    skips: list[str] = field(default_factory=list)
     trades: list[dict[str, Any]] = field(default_factory=list)
+    multi_tf_mode: str = "single"
+    by_timeframe: dict[str, Any] = field(default_factory=dict)
 
 
 def _utc_now() -> datetime:
@@ -449,6 +452,175 @@ def _unit_cost_live(
     return ((spread + slip) * pip + comm / 100.0) / max(price, 1e-12)
 
 
+def _live_policy_thresholds(
+    policy: dict[str, Any],
+    cfg: dict[str, Any],
+) -> tuple[float, float, float]:
+    """Resolve live decision gates from artifact policy + engine5 config.
+
+    When ``respect_artifact_confidence_floor`` is true (default after P0), live
+    keeps the training trade_policy floors and only applies a high safety cap
+    via ``max_live_confidence_floor``. Softening floors below the artifact is
+    intentionally disabled — that was a primary Train→Live leakage path.
+    """
+    live_thr = float(cfg.get("confidence_threshold", 0.55))
+    pol_thr = float(policy.get("decision_threshold", live_thr))
+    pol_floor = float(policy.get("confidence_floor", pol_thr))
+    edge = float(policy.get("directional_edge", cfg.get("directional_edge", 0.12)))
+    respect = bool(cfg.get("respect_artifact_confidence_floor", True))
+    max_floor = float(cfg.get("max_live_confidence_floor", 0.90))
+    max_floor = max(live_thr, max_floor)
+    if respect:
+        # Never *lower* training gates; only raise to live minimum threshold.
+        thr = max(pol_thr, live_thr)
+        floor = max(pol_floor, live_thr)
+        # Safety cap only for pathological floors (>0.95).
+        thr = min(thr, max(max_floor, thr))
+        floor = min(floor, max(max_floor, floor))
+        return thr, floor, max(0.0, edge)
+    return min(pol_thr, max_floor), min(pol_floor, max_floor), max(0.0, edge)
+
+
+def _filter_live_timeframes(timeframes: list[str], cfg: dict[str, Any] | None = None) -> list[str]:
+    """Apply blocked/allowed live TF lists from engine5 config."""
+    cfg = cfg or _cfg()
+    blocked = {str(t).upper() for t in (cfg.get("blocked_live_timeframes") or [])}
+    allowed_raw = cfg.get("allowed_live_timeframes")
+    allowed = {str(t).upper() for t in allowed_raw} if allowed_raw else None
+    out: list[str] = []
+    for tf in timeframes:
+        t = str(tf).upper().strip()
+        if not t or t in blocked:
+            continue
+        if allowed is not None and t not in allowed:
+            continue
+        if t not in out:
+            out.append(t)
+    return out
+
+
+def _rl_live_policy_gate(
+    *,
+    timeframe: str,
+    side: str,
+    confidence: float,
+    pattern_keys: list[str] | None = None,
+    cfg: dict[str, Any] | None = None,
+) -> tuple[bool, str, float]:
+    """Block entries whose RL policy context weight is strongly negative.
+
+    Returns (allowed, reason, score). Disabled when RL gate flag is off or
+    knowledge store is empty.
+    """
+    cfg = cfg or _cfg()
+    rl_cfg = dict(cfg.get("reinforcement_learning") or {})
+    if not bool(rl_cfg.get("enabled", True)):
+        return True, "rl_disabled", 0.0
+    if not bool(rl_cfg.get("live_policy_gate_enabled", False)):
+        return True, "rl_gate_off", 0.0
+    try:
+        from atis.shared.rl_learning import load_policy_weights
+
+        weights = load_policy_weights()
+    except Exception as exc:
+        return True, f"rl_gate_unavailable:{exc}", 0.0
+
+    if not weights:
+        return True, "rl_weights_empty", 0.0
+
+    tf = str(timeframe).upper()
+    side_l = str(side).lower()
+    conf = float(confidence or 0.0)
+    conf_bucket = "high" if conf >= 0.72 else "mid" if conf >= 0.58 else "low"
+    keys = [
+        f"tf:{tf}",
+        f"side:{side_l}",
+        f"tf_side:{tf}:{side_l}",
+        f"conf:{conf_bucket}",
+    ]
+    for pk in list(pattern_keys or [])[:6]:
+        keys.append(f"pat:{pk}")
+
+    score = 0.0
+    hits = 0
+    worst = 0.0
+    worst_key = ""
+    for k in keys:
+        if k in weights:
+            w = float(weights[k] or 0.0)
+            score += w
+            hits += 1
+            if w < worst:
+                worst = w
+                worst_key = k
+    if hits <= 0:
+        return True, "rl_no_key_hits", 0.0
+    avg = score / float(hits)
+    thr = float(rl_cfg.get("live_policy_block_threshold", -0.20))
+    # Block on average context OR any strongly negative key (patterns / tf_side).
+    if avg <= thr:
+        return False, f"rl_policy_block_avg:{avg:.3f}<={thr:.3f}", avg
+    if worst <= thr and (worst_key.startswith("pat:") or worst_key.startswith("tf_side:")):
+        return False, f"rl_policy_block_key:{worst_key}:{worst:.3f}", avg
+    return True, f"rl_policy_pass:{avg:.3f}", avg
+
+
+def _apply_multi_tf_confirm(
+    client: MT5Client,
+    symbol: str,
+    timeframe: str,
+    pred: int,
+    conf: float,
+    *,
+    allow_ungated: bool = True,
+    cfg: dict[str, Any] | None = None,
+    htf_cache: dict[str, pd.DataFrame] | None = None,
+) -> tuple[int, dict[str, Any]]:
+    """Run HTF confirmation/veto on a primary TF signal."""
+    cfg = cfg or _cfg()
+    if pred == 0 or not bool(cfg.get("multi_tf_confirm", False)):
+        return pred, {"multi_tf_confirm": False, "reason": "confirm_skipped"}
+    if bool(cfg.get("multi_tf_fusion", False)):
+        return pred, {"multi_tf_confirm": False, "reason": "fusion_owns_mtf"}
+
+    from atis.engines.engine4_training.multi_tf_decision import (
+        confirm_tfs_for_primary,
+        multi_tf_decision,
+    )
+
+    confirm_tfs = confirm_tfs_for_primary(timeframe, cfg)
+    confirm_dbg: list[dict[str, Any]] = []
+    for ctf in confirm_tfs[:4]:
+        try:
+            csig = analyze_timeframe_signal(
+                client,
+                symbol,
+                ctf,
+                allow_ungated=allow_ungated,
+                match_timeframe_only=True,
+                htf_cache=htf_cache,
+            )
+            confirm_dbg.append(
+                {"tf": ctf, "pred": int(csig["pred"]), "conf": float(csig["conf"])}
+            )
+        except Exception as exc:
+            confirm_dbg.append({"tf": ctf, "error": str(exc)})
+    final_pred, confirm_meta = multi_tf_decision(
+        pred,
+        conf,
+        confirm_dbg,
+        mode=str(cfg.get("multi_tf_mode", "soft_veto")),
+        min_confirm_agree=int(cfg.get("min_confirm_agree", 1)),
+        veto_opposite_htf=bool(cfg.get("veto_opposite_htf", True)),
+        primary_tf=timeframe,
+    )
+    return int(final_pred), {
+        "multi_tf_confirm": True,
+        "confirmations": confirm_dbg,
+        **(confirm_meta or {}),
+    }
+
+
 def _predict_latest(
     bundle: dict[str, Any],
     features_df: pd.DataFrame,
@@ -521,6 +693,7 @@ def _predict_latest(
         atr_pct = None
         unit_costs = None
         regime_mask = None
+        regime_raw_ok: bool | None = None
         last = features_df.iloc[-1]
         price = float(last["close"]) if "close" in features_df.columns else 0.0
         if "atr" in features_df.columns and price > 0:
@@ -534,34 +707,107 @@ def _predict_latest(
                 lo = float(live.get("regime_atr_low", 0.0) or 0.0)
                 hi_raw = live.get("regime_atr_high")
                 hi = float(hi_raw) if hi_raw is not None else float("inf")
-                regime_mask = np.array([(atr_pct[0] >= lo) and (atr_pct[0] <= hi)], dtype=bool)
+                regime_raw_ok = bool((atr_pct[0] >= lo) and (atr_pct[0] <= hi))
+                regime_mask = np.array([regime_raw_ok], dtype=bool)
 
-        use_meta = bool(live.get("meta_labeling", False)) and bool(bundle.get("trend_align", True))
+        eff_thr, eff_floor, eff_edge = _live_policy_thresholds(policy, cfg)
+        debug.update(
+            {
+                "decision_threshold": eff_thr,
+                "confidence_floor": eff_floor,
+                "directional_edge": eff_edge,
+                "artifact_confidence_floor": float(
+                    policy.get("confidence_floor", policy.get("decision_threshold", eff_thr))
+                ),
+            }
+        )
+
+        meta_override = cfg.get("live_meta_labeling", None)
+        if meta_override is None:
+            use_meta = bool(live.get("meta_labeling", False)) and bool(bundle.get("trend_align", True))
+        else:
+            use_meta = bool(meta_override) and bool(bundle.get("trend_align", True))
+
         allow_long, allow_short = trend_masks_from_frame(features_df.tail(80))
         primary = structure_primary_sides(allow_long[-1:], allow_short[-1:]) if use_meta else None
-        preds = policy_from_proba(
-            proba,
-            classes,
-            decision_threshold=float(policy.get("decision_threshold", cfg.get("confidence_threshold", 0.55))),
-            directional_edge=float(policy.get("directional_edge", cfg.get("directional_edge", 0.12))),
-            confidence_quantile=0.0,
-            confidence_floor=float(policy.get("confidence_floor", policy.get("decision_threshold", 0.55))),
-            atr_pct=atr_pct,
-            unit_costs=unit_costs,
-            cost_edge_multiple=float(live.get("cost_edge_multiple", 0.0) or 0.0),
-            regime_mask=regime_mask,
-            short_edge_multiple=float(live.get("short_edge_multiple", 1.0) or 1.0),
-            primary_sides=primary,
-        )
+        primary_side = float(primary[0]) if primary is not None and len(primary) else None
+        debug["primary_side"] = primary_side
+
+        # Soft regime: extreme artifact ATR bands should not hard-block a strong edge.
+        soft_regime = bool(cfg.get("live_soft_regime", True))
+        dir_conf = float(max(p_up, p_down))
+        if (
+            soft_regime
+            and regime_mask is not None
+            and not bool(regime_mask[0])
+            and dir_conf >= eff_floor
+            and abs(p_up - p_down) >= eff_edge
+        ):
+            regime_mask = np.array([True], dtype=bool)
+            debug["regime_soft"] = True
+
+        def _apply_policy(primary_sides: np.ndarray | None) -> np.ndarray:
+            return policy_from_proba(
+                proba,
+                classes,
+                decision_threshold=eff_thr,
+                directional_edge=eff_edge,
+                confidence_quantile=0.0,
+                confidence_floor=eff_floor,
+                atr_pct=atr_pct,
+                unit_costs=unit_costs,
+                cost_edge_multiple=float(live.get("cost_edge_multiple", 0.0) or 0.0),
+                regime_mask=regime_mask,
+                short_edge_multiple=float(live.get("short_edge_multiple", 1.0) or 1.0),
+                primary_sides=primary_sides,
+            )
+
+        preds = _apply_policy(primary)
+        reason = "e4_trade_policy"
         if not use_meta and bool(bundle.get("trend_align", True)):
             preds = apply_trend_align(preds, allow_long[-1:], allow_short[-1:])
         side = int(preds[0])
+
+        # Soft meta: structure filter starved the bar — fall back to model (± trend).
+        if (
+            side == 0
+            and use_meta
+            and bool(cfg.get("live_soft_meta_fallback", True))
+            and dir_conf >= eff_floor
+            and abs(p_up - p_down) >= eff_edge
+        ):
+            preds_fb = _apply_policy(None)
+            require_trend = bool(cfg.get("live_soft_meta_require_trend", True))
+            # Strong model edge may override structure even when EMA disagrees.
+            override_conf = float(cfg.get("live_meta_override_conf", 0.68))
+            if dir_conf >= override_conf:
+                require_trend = False
+            if require_trend:
+                preds_fb = apply_trend_align(preds_fb, allow_long[-1:], allow_short[-1:])
+            if int(preds_fb[0]) != 0:
+                side = int(preds_fb[0])
+                reason = "e4_soft_meta_fallback"
+
         conf = float(max(p_up, p_down, p_hold))
         if side != 0:
             conf = float(p_up if side > 0 else p_down)
-        debug["reason"] = "e4_trade_policy" if side != 0 else "e4_hold"
+        elif primary_side is not None and primary_side != 0.0:
+            # Report the structure-side confidence that failed the gate (not max proba).
+            conf = float(p_up if primary_side > 0 else p_down)
+            reason = "e4_hold_meta_side"
+        elif regime_raw_ok is False and not debug.get("regime_soft"):
+            reason = "e4_hold_regime"
+        elif dir_conf < eff_floor:
+            reason = "e4_hold_floor"
+        elif abs(p_up - p_down) < eff_edge:
+            reason = "e4_hold_edge"
+        else:
+            reason = "e4_hold"
+
+        debug["reason"] = reason
         debug["meta_labeling"] = use_meta
         debug["regime_ok"] = None if regime_mask is None else bool(regime_mask[0])
+        debug["regime_raw_ok"] = regime_raw_ok
         return side, conf, debug
 
     # Legacy relative directional fallback (older artifacts without trade_policy).
@@ -868,6 +1114,7 @@ def close_position(
     if not positions:
         raise ValueError(f"position_not_found:{ticket}")
     pos = positions[0]
+    pos_snap = serialize_position(pos, mt5)
     symbol = str(getattr(pos, "symbol", "") or "")
     volume = float(getattr(pos, "volume", 0) or 0)
     if volume <= 0:
@@ -914,17 +1161,59 @@ def close_position(
         getattr(mt5, "TRADE_RETCODE_DONE", 10009),
         getattr(mt5, "TRADE_RETCODE_DONE_PARTIAL", 10010),
     )
-    return {
+    # Floating PnL at send time — prefer realized deal history right after fill.
+    net_profit = float(pos_snap.get("net_profit", pos_snap.get("profit", 0)) or 0)
+    exit_price = price
+    deal_meta: dict[str, Any] = {"mt5": payload, "source": "api_close"}
+    if ok:
+        try:
+            import time as _time
+
+            from atis.shared.winning_trade_store import fetch_deal_pnl_for_position
+
+            for _ in range(3):
+                _time.sleep(0.15)
+                deal = fetch_deal_pnl_for_position(int(ticket))
+                if isinstance(deal, dict) and deal.get("has_out"):
+                    net_profit = float(deal.get("net_profit") or 0.0)
+                    if deal.get("exit_price"):
+                        exit_price = float(deal["exit_price"])
+                    deal_meta = {**deal_meta, **deal}
+                    break
+        except Exception as exc:
+            logger.warning("close_deal_pnl_refresh_failed", ticket=ticket, error=str(exc))
+    out = {
         "ok": ok,
         "ticket": int(ticket),
         "symbol": symbol,
         "side": "buy" if is_buy else "sell",
         "volume": volume,
         "profit": float(getattr(pos, "profit", 0) or 0),
+        "net_profit": net_profit,
+        "exit_price": exit_price,
         "retcode": retcode,
         "comment": str(payload.get("comment", "") or ""),
         "mt5": payload,
     }
+    if ok:
+        try:
+            from atis.shared.winning_trade_store import finalize_closed_trade
+
+            stored = finalize_closed_trade(
+                ticket=int(ticket),
+                net_profit=net_profit,
+                exit_price=exit_price,
+                close_reason=str(comment or "ATIS close"),
+                position_snapshot=pos_snap,
+                deal_meta=deal_meta,
+            )
+            if stored is not None:
+                out["training_stored"] = bool(stored.get("for_training"))
+                out["is_winner"] = bool(stored.get("is_winner"))
+                out["net_profit"] = float(stored.get("net_profit", net_profit) or net_profit)
+        except Exception as exc:
+            logger.warning("winning_trade_finalize_failed", ticket=ticket, error=str(exc))
+    return out
 
 
 def close_positions_filtered(
@@ -1114,6 +1403,56 @@ def analyze_timeframe_signal(
     }
 
 
+def _register_open_for_training(
+    *,
+    rec: TradeRecord,
+    timeframe: str,
+    pred: int,
+    exit_meta: dict[str, Any],
+    prediction_debug: dict[str, Any] | None,
+    featured: pd.DataFrame,
+    pattern_explain: dict[str, Any] | None = None,
+    multi_tf_context: dict[str, Any] | None = None,
+    mt5_result: dict[str, Any] | None = None,
+) -> None:
+    """Freeze full open-trade + pattern details for later winner-only training store."""
+    try:
+        from atis.shared.winning_trade_store import (
+            feature_snapshot_from_row,
+            register_open_trade,
+        )
+
+        register_open_trade(
+            {
+                "ticket": rec.ticket,
+                "symbol": rec.symbol,
+                "side": rec.side,
+                "volume": rec.volume,
+                "entry_price": rec.entry_price,
+                "sl": rec.sl,
+                "tp": rec.tp,
+                "confidence": rec.confidence,
+                "reason": rec.reason,
+                "ts": rec.ts,
+                "opened_at": rec.ts,
+                "mode": rec.mode,
+                "timeframe": timeframe,
+                "pred": int(pred),
+                "pattern_keys": list(rec.pattern_keys or []),
+                "pattern_ids": list(rec.pattern_ids or []),
+                "pattern_summary": rec.pattern_summary or "",
+                "pattern_explain": pattern_explain or {},
+                "exit_meta": exit_meta or {},
+                "prediction_debug": prediction_debug or {},
+                "feature_snapshot": feature_snapshot_from_row(featured),
+                "multi_tf_context": multi_tf_context or {},
+                "mt5": mt5_result or {},
+            }
+        )
+    except Exception as exc:
+        logger.warning("open_trade_register_failed", error=str(exc), ticket=rec.ticket)
+
+
 def _append_decision(decisions_log: Path, decision: dict[str, Any]) -> None:
     with decisions_log.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(decision, default=str) + "\n")
@@ -1142,14 +1481,62 @@ def _place_from_signal(
 ) -> None:
     # Gate 1 (mandatory): trained model / fused TF signal — never enter on spread alone.
     if pred == 0 or conf < conf_thr:
-        report.errors.append(
-            f"{symbol}:skip pred={pred} conf={conf:.3f} thr={conf_thr}{reason_suffix}"
+        dbg = prediction_debug or {}
+        hold_reason = str(dbg.get("reason") or ("flat" if pred == 0 else "low_conf"))
+        gate = dbg.get("confidence_floor", conf_thr)
+        msg = (
+            f"{symbol}/{timeframe}:skip pred={pred} conf={conf:.3f} "
+            f"thr={conf_thr} gate={gate} reason={hold_reason}{reason_suffix}"
         )
+        # Routine holds are skips, not hard errors (UI last_error stays clean).
+        if hasattr(report, "skips"):
+            report.skips.append(msg)
+        else:
+            report.errors.append(msg)
         return
 
     cfg = _cfg()
     atis_only = bool(cfg.get("count_atis_positions_only", True))
     use_spread = bool(cfg.get("use_live_spread_filter", True))
+
+    side = "buy" if pred > 0 else "sell"
+    pattern_keys: list[str] = []
+    if isinstance(prediction_debug, dict):
+        overlay = prediction_debug.get("pattern_overlay") or {}
+        if isinstance(overlay, dict):
+            pattern_keys = list(overlay.get("keys") or [])[:6]
+        if not pattern_keys:
+            pattern_keys = list(prediction_debug.get("pattern_keys") or [])[:6]
+    rl_ok, rl_reason, rl_score = _rl_live_policy_gate(
+        timeframe=timeframe,
+        side=side,
+        confidence=float(conf),
+        pattern_keys=pattern_keys,
+        cfg=cfg,
+    )
+    if isinstance(prediction_debug, dict):
+        prediction_debug["rl_policy_gate"] = {
+            "allowed": rl_ok,
+            "reason": rl_reason,
+            "score": rl_score,
+        }
+    if not rl_ok:
+        report.blocked_by_risk += 1
+        msg = f"{symbol}/{timeframe}:skip {rl_reason} conf={conf:.3f}{reason_suffix}"
+        if hasattr(report, "skips"):
+            report.skips.append(msg)
+        else:
+            report.errors.append(msg)
+        logger.info(
+            "trade_blocked",
+            symbol=symbol,
+            timeframe=timeframe,
+            reason=rl_reason,
+            side=side,
+            conf=conf,
+            rl_score=rl_score,
+        )
+        return
 
     # Gate 2 (optional): live bid-ask filter — only when enabled in Settings.
     spread_pips = float("nan")
@@ -1228,7 +1615,6 @@ def _place_from_signal(
             )
             break
 
-        side = "buy" if pred > 0 else "sell"
         atr_value = float(featured["atr"].iloc[-1])
         price = float(featured["close"].iloc[-1])
         if not np.isfinite(atr_value) or atr_value <= 0:
@@ -1328,6 +1714,15 @@ def _place_from_signal(
             placed += 1
             with trades_log.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps({**asdict(rec), "exit_meta": exit_meta}, default=str) + "\n")
+            _register_open_for_training(
+                rec=rec,
+                timeframe=timeframe,
+                pred=pred,
+                exit_meta=exit_meta,
+                prediction_debug=prediction_debug,
+                featured=featured,
+                pattern_explain=(link_info.get("explain") if isinstance(link_info, dict) else None),
+            )
             logger.info("paper_trade", **asdict(rec), exit_meta=exit_meta)
             # Synthetic slot so subsequent scale-ins respect max_open in paper mode.
             working.append(
@@ -1404,6 +1799,31 @@ def _place_from_signal(
                     )
                     + "\n"
                 )
+            # Prefer the live position ticket (may differ from order ticket).
+            position_ticket = rec.ticket
+            try:
+                mt5 = _mt5_module()
+                working = list(mt5.positions_get() or [])
+                tracked = filter_atis_positions(
+                    working, symbol, atis_only=atis_only, timeframe=timeframe
+                )
+                # Newest matching position by open time.
+                if tracked:
+                    newest = max(tracked, key=lambda p: int(getattr(p, "time", 0) or 0))
+                    position_ticket = int(getattr(newest, "ticket", 0) or 0) or position_ticket
+                    rec.ticket = position_ticket
+            except Exception:
+                pass
+            _register_open_for_training(
+                rec=rec,
+                timeframe=timeframe,
+                pred=pred,
+                exit_meta=exit_meta,
+                prediction_debug=prediction_debug,
+                featured=featured,
+                pattern_explain=(link_info.get("explain") if isinstance(link_info, dict) else None),
+                mt5_result=result if isinstance(result, dict) else {},
+            )
             if bool(cfg.get("shadow_tracking_enabled", True)):
                 try:
                     from atis.engines.engine4_training.shadow_challenger import record_shadow_decision
@@ -1487,6 +1907,12 @@ def run_live_once(
     if bad:
         raise RuntimeError(f"Live trading restricted to {sorted(allowed)}; refused: {bad}")
     timeframe = timeframe or str(cfg.get("timeframe") or full.get("trading", {}).get("primary_timeframe", "M5"))
+    filtered = _filter_live_timeframes([str(timeframe).upper()], cfg)
+    if not filtered:
+        raise RuntimeError(
+            f"Timeframe {timeframe} blocked by blocked_live_timeframes / allowed_live_timeframes"
+        )
+    timeframe = filtered[0]
     exec_mode = "paper" if dry_run else "demo"
 
     report = LiveLoopReport(started_at=_utc_now().isoformat())
@@ -1544,41 +1970,26 @@ def run_live_once(
                 featured = sig["featured"]
                 bundle = sig["bundle"]
 
-                # Optional legacy confirm layer for single-TF runs.
+                # Optional confirm layer for single-TF runs.
                 if (
                     pred != 0
                     and bool(cfg.get("multi_tf_confirm", False))
-                    and not bool(cfg.get("multi_tf_fusion", True))
+                    and not bool(cfg.get("multi_tf_fusion", False))
                     and bundle.get("artifact_type") != "llmodel"
                 ):
-                    from atis.engines.engine4_training.multi_tf_decision import (
-                        confirm_tfs_for_primary,
-                        multi_tf_decision,
+                    pred, confirm_meta = _apply_multi_tf_confirm(
+                        client,
+                        symbol,
+                        timeframe,
+                        pred,
+                        conf,
+                        allow_ungated=True,
+                        cfg=cfg,
                     )
-
-                    confirm_tfs = confirm_tfs_for_primary(timeframe, cfg)
-                    confirm_dbg: list[dict[str, Any]] = []
-                    for ctf in confirm_tfs[:4]:
-                        try:
-                            csig = analyze_timeframe_signal(
-                                client, symbol, ctf, allow_ungated=True, match_timeframe_only=True
-                            )
-                            confirm_dbg.append({"tf": ctf, "pred": int(csig["pred"]), "conf": float(csig["conf"])})
-                        except Exception as exc:
-                            confirm_dbg.append({"tf": ctf, "error": str(exc)})
-                    pred, mtf_dbg = multi_tf_decision(
-                        int(pred),
-                        float(conf),
-                        confirm_dbg,
-                        mode=str(cfg.get("multi_tf_mode", "soft_veto")),
-                        min_confirm_agree=int(cfg.get("min_confirm_agree", 1)),
-                        veto_opposite_htf=bool(cfg.get("veto_opposite_htf", True)),
-                        primary_tf=str(timeframe),
-                    )
-                    dbg["multi_tf_confirm"] = confirm_dbg
-                    dbg["multi_tf_decision"] = mtf_dbg
+                    dbg["multi_tf_confirm"] = confirm_meta.get("confirmations") or confirm_meta
+                    dbg["multi_tf_decision"] = confirm_meta
                     if pred == 0:
-                        dbg["reason"] = mtf_dbg.get("reason", "multi_tf_veto")
+                        dbg["reason"] = confirm_meta.get("reason", "multi_tf_veto")
 
                 decision = {
                     "ts": _utc_now().isoformat(),
@@ -1645,6 +2056,8 @@ def run_live_multi_tf(
     *,
     dry_run: bool = True,
     allow_ungated: bool = True,
+    force_independent: bool | None = None,
+    force_fusion: bool | None = None,
 ) -> LiveLoopReport:
     """Run selected timeframes with their trained models.
 
@@ -1653,6 +2066,8 @@ def run_live_multi_tf(
 
     Optional legacy fusion: set ``multi_tf_fusion: true`` to merge votes into
     one decision before placing a single order.
+
+    ``force_independent`` / ``force_fusion`` override YAML for one call (UI).
     """
     ensure_project_dirs()
     set_global_seed()
@@ -1672,17 +2087,29 @@ def run_live_multi_tf(
     tfs = [str(t).upper() for t in (timeframes or []) if str(t).strip()]
     if not tfs:
         tfs = [str(cfg.get("timeframe") or full.get("trading", {}).get("primary_timeframe", "H1"))]
-    # De-dupe preserve order
+    # De-dupe preserve order, then apply blocked/allowed live TF policy.
     seen: set[str] = set()
     tfs = [t for t in tfs if not (t in seen or seen.add(t))]
+    tfs = _filter_live_timeframes(tfs, cfg)
+    if not tfs:
+        raise RuntimeError(
+            "No live timeframes left after blocked_live_timeframes / allowed_live_timeframes filter"
+        )
 
     # Single TF → dedicated path (still uses trained model for that TF).
     if len(tfs) == 1:
-        return run_live_once(symbols, tfs[0], dry_run=dry_run, allow_ungated=allow_ungated)
+        report = run_live_once(symbols, tfs[0], dry_run=dry_run, allow_ungated=allow_ungated)
+        report.multi_tf_mode = "single"
+        return report
 
-    independent = bool(cfg.get("multi_tf_independent", True)) and not bool(
-        cfg.get("multi_tf_fusion", False)
-    )
+    if force_fusion is True:
+        independent = False
+    elif force_independent is True:
+        independent = True
+    else:
+        independent = bool(cfg.get("multi_tf_independent", True)) and not bool(
+            cfg.get("multi_tf_fusion", False)
+        )
     if independent:
         return _run_live_multi_tf_independent(
             symbols,
@@ -1707,7 +2134,10 @@ def _run_live_multi_tf_independent(
 ) -> LiveLoopReport:
     """Each TF: own model, own bars, own decision, own order attempt."""
     cfg = _cfg()
-    report = LiveLoopReport(started_at=_utc_now().isoformat())
+    report = LiveLoopReport(
+        started_at=_utc_now().isoformat(),
+        multi_tf_mode="independent",
+    )
     risk = RiskManager()
     conf_thr = float(cfg.get("confidence_threshold", 0.60))
     sl_mult = float(cfg.get("stop_loss_atr_multiplier", 1.5))
@@ -1728,6 +2158,8 @@ def _run_live_multi_tf_independent(
             report.iterations += 1
             # No shared HTF cache across TFs — each timeframe stays isolated.
             for tf in tfs:
+                tf_before_orders = int(report.orders_sent)
+                tf_before_signals = int(report.signals)
                 try:
                     sig = analyze_timeframe_signal(
                         client,
@@ -1742,13 +2174,33 @@ def _run_live_multi_tf_independent(
                     featured = sig["featured"]
                     dbg = dict(sig.get("debug") or {})
                     dbg["multi_tf_mode"] = "independent"
-                    dbg["reason"] = dbg.get("reason") or "per_tf_independent"
+
+                    if pred != 0 and bool(cfg.get("multi_tf_confirm", False)):
+                        pred, confirm_meta = _apply_multi_tf_confirm(
+                            client,
+                            symbol,
+                            tf,
+                            pred,
+                            conf,
+                            allow_ungated=allow_ungated,
+                            cfg=cfg,
+                            htf_cache=None,
+                        )
+                        dbg["confirm"] = confirm_meta
+                        if pred == 0:
+                            dbg["reason"] = str(
+                                confirm_meta.get("reason") or "mtf_confirm_veto"
+                            )
+                        else:
+                            dbg["reason"] = dbg.get("reason") or "per_tf_confirmed"
+                    else:
+                        dbg["reason"] = dbg.get("reason") or "per_tf_independent"
 
                     decision = {
                         "ts": _utc_now().isoformat(),
                         "symbol": symbol,
                         "timeframe": tf,
-                        "timeframes": [tf],
+                        "timeframes": list(tfs),
                         "pred": pred,
                         "confidence": conf,
                         "threshold": conf_thr,
@@ -1798,6 +2250,16 @@ def _run_live_multi_tf_independent(
                         reason_suffix=";mode=independent",
                         prediction_debug=dbg,
                     )
+                    report.by_timeframe[tf] = {
+                        "pred": pred,
+                        "confidence": conf,
+                        "model_type": sig.get("model_type") or "per_tf",
+                        "model_version": sig.get("model_version"),
+                        "model_timeframe": sig.get("model_timeframe", tf),
+                        "reason": dbg.get("reason"),
+                        "signals": int(report.signals) - tf_before_signals,
+                        "orders": int(report.orders_sent) - tf_before_orders,
+                    }
                     # Broker refresh only for live/demo fills; paper keeps synthetic slots.
                     if not dry_run:
                         try:
@@ -1806,6 +2268,7 @@ def _run_live_multi_tf_independent(
                             pass
                 except Exception as exc:
                     report.errors.append(f"{symbol}/{tf}:{exc}")
+                    report.by_timeframe[tf] = {"error": str(exc), "pred": 0, "orders": 0}
                     logger.warning(
                         "mtf_independent_tf_failed",
                         symbol=symbol,
@@ -1830,7 +2293,10 @@ def _run_live_multi_tf_fused(
     from atis.engines.engine4_training.multi_tf_decision import fuse_multi_tf_votes
 
     cfg = _cfg()
-    report = LiveLoopReport(started_at=_utc_now().isoformat())
+    report = LiveLoopReport(
+        started_at=_utc_now().isoformat(),
+        multi_tf_mode="fusion",
+    )
     risk = RiskManager()
     conf_thr = float(cfg.get("confidence_threshold", 0.60))
     sl_mult = float(cfg.get("stop_loss_atr_multiplier", 1.5))

@@ -107,6 +107,10 @@ engine4_training:
   stable_feature_windows: 3
   engineer_learning_features: true
   cross_tf_features: true
+  rl_features_enabled: true
+  rl_label_reweight: true
+  rl_label_reweight_strength: 0.35
+  rl_consume_queue_on_train: true
   pattern_relation_features: true
   pattern_relation_top_co: 12
   pattern_relation_top_prec: 16
@@ -254,7 +258,7 @@ engine4_training:
   fail_on_regime_balanced_holdouts: false
   regime_balanced_min_regimes: 3
   regime_balanced_min_win_rate: 0.48
-  regime_balanced_min_expectancy: -0.000001
+  regime_balanced_min_expectancy: -1.0e-06
   min_consistency_score: 55
   min_consistency_for_live: 55
   consistency_max_cv_win_rate: 0.25
@@ -360,12 +364,12 @@ engine4_training:
   regime_eval_vol_low_q: 0.3
   regime_eval_vol_high_q: 0.7
   regime_min_bars: 40
-  data_intel_hard: false
+  data_intel_hard: true
   data_intel_min_score: 55
   feature_intelligence_enabled: true
   feature_corr_threshold: 0.92
   label_quality_enabled: true
-  label_quality_hard: false
+  label_quality_hard: true
   label_quality_min_score: 45
   label_noise_cv_splits: 3
   label_max_noise_score: 0.65
@@ -429,7 +433,7 @@ engine4_training:
   fail_on_stress_fragile: true
   min_stress_worst_sharpe: -1
   fail_on_monte_carlo_unstable: false
-  fail_on_low_live_readiness: false
+  fail_on_low_live_readiness: true
   min_live_readiness: 55
   apply_self_optimize: true
   fail_h4_near_chance: true
@@ -516,6 +520,15 @@ engine4_training:
     - structure_hh_hl
     - dist_to_support
     - dist_to_resist
+    - feat_rl_pattern_affinity
+    - feat_rl_pattern_conflict
+    - feat_rl_net_edge
+    - feat_rl_reward_pressure
+    - feat_rl_quality_pressure
+    - feat_rl_winrate_pressure
+    - rl_reward_ema
+    - rl_win_rate_ema
+    - rl_policy_tf_weight
 engine5_live:
   mode: paper
   symbols:
@@ -528,12 +541,19 @@ engine5_live:
   multi_tf_independent: true
   multi_tf_fusion: false
   multi_tf_fusion_mode: weighted_consensus
-  multi_tf_min_agree: 1
-  multi_tf_confirm: false
+  multi_tf_min_agree: 2
+  multi_tf_confirm: true
   multi_tf_mode: soft_veto
-  veto_opposite_htf: false
+  veto_opposite_htf: true
   min_confirm_agree: 1
-  max_open_positions_per_tf: 5
+  max_open_positions_per_tf: 2
+  blocked_live_timeframes:
+  - M1
+  allowed_live_timeframes:
+  - M5
+  - M15
+  - M30
+  - H1
   confirm_timeframes:
   - H4
   - H1
@@ -558,52 +578,57 @@ engine5_live:
     - H4
     H4:
     - D1
-  confidence_threshold: 0.52
+  confidence_threshold: 0.58
+  respect_artifact_confidence_floor: true
+  max_live_confidence_floor: 0.9
+  live_soft_regime: false
+  live_soft_meta_fallback: false
+  live_soft_meta_require_trend: true
+  live_meta_override_conf: 0.85
   directional_decision: true
   directional_rel_threshold: 0.55
   min_side_probability: 0.2
-  directional_edge: 0.12
-  risk_per_trade_pct: 0.35
+  directional_edge: 0.16
+  risk_per_trade_pct: 0.25
   confidence_sizing_enabled: true
   confidence_sizing_base: 1.0
-  confidence_sizing_max: 1.5
+  confidence_sizing_max: 1.25
   confidence_sizing_min: 0.25
   shadow_tracking_enabled: true
   shadow_min_decisions: 40
   auto_retrain_request_enabled: true
   daily_loss_limit_pct: 3.0
   weekly_loss_limit_pct: 7.0
-  max_open_positions: 20
-  max_exposure_pct: 8.0
+  max_open_positions: 8
+  max_exposure_pct: 6.0
   count_atis_positions_only: true
-  max_entries_per_cycle: 8
-  scale_in_when_tight_spread: true
+  max_entries_per_cycle: 2
+  scale_in_when_tight_spread: false
   use_live_spread_filter: false
-  max_entry_spread_pips: 12.0
-  tight_spread_pips: 12.0
+  max_entry_spread_pips: 25.0
+  tight_spread_pips: 15.0
   stop_loss_atr_multiplier: 1.2
-  take_profit_atr_multiplier: 1.8
+  take_profit_atr_multiplier: 2.0
   dynamic_exits:
-    # Near-entry exits: local structure + live ATR (not distant historical S/R).
     enabled: true
-    min_rr: 1.15
-    tp_confidence_min: 0.50
+    min_rr: 1.5
+    tp_confidence_min: 0.55
     tp_confidence_max: 0.85
-    risk_dampen: 0.40
-    tp_atr_fallback_min: 0.9
-    tp_atr_fallback_max: 2.0
-    tp_atr_clamp_min: 0.6
-    tp_atr_clamp_max: 2.4
-    sl_atr_base: 0.85
-    sl_atr_risk_extra: 0.55
-    sl_atr_conf_tighten: 0.35
-    sl_atr_clamp_min: 0.45
+    risk_dampen: 0.35
+    tp_atr_fallback_min: 1.1
+    tp_atr_fallback_max: 2.4
+    tp_atr_clamp_min: 0.9
+    tp_atr_clamp_max: 2.6
+    sl_atr_base: 0.95
+    sl_atr_risk_extra: 0.45
+    sl_atr_conf_tighten: 0.2
+    sl_atr_clamp_min: 0.7
     sl_atr_clamp_max: 1.8
     structure_buffer_atr: 0.12
     structure_sl_max_atr: 1.6
-    structure_tp_max_atr: 2.0
-    structure_reach_max_atr: 2.2
-    structure_sl_min_vs_vol: 0.45
+    structure_tp_max_atr: 2.4
+    structure_reach_max_atr: 2.4
+    structure_sl_min_vs_vol: 0.55
     local_swing_lookback: 12
     structure_tp_snap: true
     skip_if_rr_below_min: true
@@ -614,6 +639,42 @@ engine5_live:
     lookback_bars: 8
     max_patterns: 40
     poll_hint_ms: 250
+  winning_trade_store:
+    enabled: true
+    winners_only: false
+    include_losses: true
+    min_profit: 0.0
+    root: data/training_trades
+    audit_all_closes: true
+    update_pattern_kb: true
+  reinforcement_learning:
+    enabled: true
+    root: data/rl_knowledge
+    update_pattern_kb: true
+    queue_saved_for_training: true
+    inject_bar_features: true
+    inject_causal_timeline: true
+    live_policy_gate_enabled: true
+    live_policy_block_threshold: -0.2
+    policy_learning_rate: 0.08
+    ema_alpha: 0.12
+    save_reward_abs_min: 0.12
+    save_min_quality: 0.35
+    winner_save_min_quality: 0.28
+    pending_reward_abs_max: 0.12
+    reject_if_quality_below: 0.22
+    soft_cap_good_quality_loss: false
+    reward:
+      w_pnl: 0.4
+      w_quality: 0.22
+      w_rr: 0.18
+      w_process: 0.12
+      w_violation: 0.25
+      w_noise: 0.12
+      pnl_norm_scale: 2.0
+      min_confidence_quality: 0.58
+      high_confidence_quality: 0.72
+      min_planned_rr: 1.5
 web:
   host: 127.0.0.1
   port: 8787
